@@ -370,70 +370,133 @@
         document.getElementById('mainContent').innerHTML = faqContent;
         document.getElementById('sidebar').innerHTML = '<h2>FAQ</h2>';
     }
-    
     // Load demo videos
-    async function loadDemos() {
+    function loadDemos() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
         
-        try {
-            // Try to fetch the demos directory content
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/media/demos?ref=${mainBranch}`);
+        // Base path for demos directory
+        const demosPath = 'media/demos/';
+        
+        // Add a fetch request to a json file or try multiple potential video files
+        let demosContent = '<h2>Demo Videos</h2>';
+        
+        // Always display the WoW Multiboxing image first
+        demosContent += `
+        <div>
+            <h3>World of Warcraft Multiboxing Example</h3>
+            <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+        </div>`;
+        
+        // Create a grid for videos
+        demosContent += '<div class="video-grid">';
+        
+        // Try to load common video formats for known demos
+        const videoNames = ['demo-scaling', 'demo-startup'];
+        const videoExtensions = ['.mp4', '.webm', '.ogg'];
+        
+        videoNames.forEach(videoName => {
+            const formattedName = videoName
+                .replace(/-|_/g, ' ')  // Replace hyphens and underscores with spaces
+                .replace(/\b\w/g, l => l.toUpperCase());  // Capitalize each word
             
-            if (!response.ok) {
-                throw new Error('Network response was not ok or demos directory not found');
-            }
-            
-            const data = await response.json();
-            const videoFiles = data.filter(file => 
-                file.name.endsWith('.mp4') || 
-                file.name.endsWith('.webm') || 
-                file.name.endsWith('.ogg')
-            );
-            
-            let demosContent = '<h2>Demo Videos</h2>';
-            
-            // Always display the WoW Multiboxing image first
             demosContent += `
-            <div>
-                <h3>World of Warcraft Multiboxing Example</h3>
-                <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+            <div class="video-item">
+                <h3>${formattedName}</h3>
+                <video controls width="100%">`;
+                
+            // Try different formats, browser will use the first one that works
+            videoExtensions.forEach(ext => {
+                demosContent += `<source src="${demosPath}${videoName}${ext}" type="video/${ext.substring(1)}">`;
+            });
+            
+            demosContent += `
+                    Your browser does not support these video formats.
+                </video>
             </div>`;
-            
-            if (videoFiles.length > 0) {
-                videoFiles.forEach(video => {
-                    const videoTitle = video.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-                    
-                    demosContent += `
-                    <div class="video-container">
-                        <h3>${videoTitle}</h3>
-                        <video controls width="100%">
-                            <source src="${video.download_url}" type="video/${video.name.split('.').pop()}">
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>`;
-                });
-            } else {
-                demosContent += '<p>No additional demo videos available at this time.</p>';
+        });
+        
+        // Close the grid
+        demosContent += '</div>';
+        
+        // Add CSS for the grid
+        const style = document.createElement('style');
+        style.textContent = `
+            .video-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
             }
+            .video-item {
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 10px;
+                background: #f9f9f9;
+            }
+            .video-item h3 {
+                margin-top: 0;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.getElementById('mainContent').innerHTML = demosContent;
+        document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
+        
+        // Alternative approach: scan for potential video files
+        // This will try to load various potential video files and show them if found
+        checkForAdditionalVideos();
+    }
+    
+    // Function to check for additional videos beyond known ones
+    function checkForAdditionalVideos() {
+        const demosPath = 'media/demos/';
+        const potentialVideos = [
+            'demo-controls', 'demo-features', 'demo-overview', 
+            'multibox-example', 'wow-demo', 'nickbox-intro'
+        ];
+        const videoGrid = document.querySelector('.video-grid');
+        
+        if (!videoGrid) return;
+        
+        potentialVideos.forEach(name => {
+            // Try to load the video
+            const video = document.createElement('video');
+            video.controls = true;
+            video.style.display = 'none'; // Hide until we know it exists
             
-            document.getElementById('mainContent').innerHTML = demosContent;
-            document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
+            const source = document.createElement('source');
+            source.src = `${demosPath}${name}.mp4`;
+            source.type = 'video/mp4';
             
-        } catch (error) {
-            console.error('Error fetching demo videos:', error);
+            video.appendChild(source);
             
-            // Fallback to showing just the WoW image
-            const fallbackContent = `
-                <h2>Demos</h2>
-                <p>Video demonstrations could not be loaded.</p>
+            // Add handlers to manage video discovery
+            video.addEventListener('loadeddata', () => {
+                // Video exists and loaded
+                const formattedName = name
+                    .replace(/-|_/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+                    
+                const videoItem = document.createElement('div');
+                videoItem.className = 'video-item';
+                videoItem.innerHTML = `
+                    <h3>${formattedName}</h3>
+                `;
                 
-                <div>
-                    <h3>World of Warcraft Multiboxing Example</h3>
-                    <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
-                </div>`;
-                
-            document.getElementById('mainContent').innerHTML = fallbackContent;
-        }
+                video.style.display = 'block';
+                video.width = '100%';
+                videoItem.appendChild(video);
+                videoGrid.appendChild(videoItem);
+            });
+            
+            video.addEventListener('error', () => {
+                // Video doesn't exist or couldn't load, do nothing
+                video.remove();
+            });
+            
+            // Start loading to check if file exists
+            document.body.appendChild(video);
+        });
     }
     
     // View source code in modal
