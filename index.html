@@ -145,7 +145,7 @@
 <script>
     // Repository information
     const repoOwner = 'mostlynick3';
-    const repoName = 'NickBox-simple-Python-multiboxer';
+    const repoName = 'NickBox';
     const webBranch = 'web';  // Everything now references web branch
     
     // Function to fetch and parse content from web branch
@@ -242,38 +242,15 @@
         }
     }
     
-	async function loadDownloads() {
-	  const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases.atom`;
+	function loadDownloads() {
+	  const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases`;
 	
-	  try {
-		const response = await fetch(releasesUrl);
-		const xml = await response.text();
+	  document.getElementById('mainContent').innerHTML = `
+	    <p>You can find the latest releases on the GitHub releases page:</p>
+	    <a href="${releasesUrl}" target="_blank">GitHub Releases</a>
+	  `;
 	
-		const parser = new DOMParser();
-		const xmlDoc = parser.parseFromString(xml, "application/xml");
-		const items = xmlDoc.querySelectorAll('entry');
-	
-		let downloadsHtml = '<h2>Downloads</h2><ul>';
-	
-		items.forEach(item => {
-		  const title = item.querySelector('title').textContent;
-		  const link = item.querySelector('link').getAttribute('href');
-		  const published = item.querySelector('published').textContent;
-		  const formattedDate = new Date(published).toLocaleDateString();
-	
-		  downloadsHtml += `<li><a href="${link}">${title}</a> (${formattedDate})</li>`;
-		});
-	
-		downloadsHtml += '</ul>';
-	
-		document.getElementById('mainContent').innerHTML = downloadsHtml;
-		document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
-	
-	  } catch (error) {
-		console.error('Error fetching or parsing RSS feed:', error);
-		document.getElementById('mainContent').innerHTML = '<p>Failed to load downloads.</p>';
-		document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
-	  }
+	  document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
 	}
     
     // Load license content directly in the main content area
