@@ -181,38 +181,41 @@
 	    }
 	}
     
-    // Enhanced markdown parser
-    function parseMarkdown(markdown) {
-        let html = markdown
-            // Headers
-            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-            // Bold
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            // Italic
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Bullet lists
-            .replace(/^\* (.*$)/gim, '<li>$1</li>')
-            // Links
-            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
-        
-        // Wrap list items in ul tags
-        html = html.replace(/<li>.*?<\/li>/gs, match => {
-            return `<ul>${match}</ul>`;
-        });
-        
-        // Convert line breaks to paragraphs (excluding lists and headers)
-        const paragraphs = html.split(/\n\s*\n/);
-        html = paragraphs.map(p => {
-            if (!p.trim().startsWith('<')) {
-                return `<p>${p.trim()}</p>`;
-            }
-            return p;
-        }).join('\n');
-        
-        return html;
-    }
+	// Enhanced markdown parser
+	function parseMarkdown(markdown) {
+	    // Remove any img HTML tags before processing
+	    markdown = markdown.replace(/<img[^>]*>/g, '');
+	    
+	    let html = markdown
+	        // Headers
+	        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+	        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+	        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+	        // Bold
+	        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+	        // Italic
+	        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+	        // Bullet lists
+	        .replace(/^\* (.*$)/gim, '<li>$1</li>')
+	        // Links
+	        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+	    
+	    // Wrap list items in ul tags
+	    html = html.replace(/<li>.*?<\/li>/gs, match => {
+	        return `<ul>${match}</ul>`;
+	    });
+	    
+	    // Convert line breaks to paragraphs (excluding lists and headers)
+	    const paragraphs = html.split(/\n\s*\n/);
+	    html = paragraphs.map(p => {
+	        if (!p.trim().startsWith('<')) {
+	            return `<p>${p.trim()}</p>`;
+	        }
+	        return p;
+	    }).join('\n');
+	    
+	    return html;
+	}
     
     // Load homepage (README.md content from web branch)
     async function loadHomePage() {
