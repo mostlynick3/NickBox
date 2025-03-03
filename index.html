@@ -1,126 +1,288 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>NickBox - Simple Python Multiboxer</title>
-<style>
-body {
-    font-family: sans-serif;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-}
-
-header {
-    background-color: #f0f0f0;
-    padding: 10px;
-    text-align: center;
-}
-
-nav {
-    background-color: #e0e0e0;
-    padding: 10px;
-    text-align: center;
-}
-
-nav a {
-    margin: 0 15px;
-    text-decoration: none;
-    color: #333;
-}
-
-nav a:hover {
-    text-decoration: underline;
-}
-
-.main-content {
-    display: flex;
-    flex: 1;
-    overflow: auto;
-}
-
-.sidebar {
-    width: 200px;
-    background-color: #f8f8f8;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.content {
-    flex: 1;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.img-logo {
-    max-width: 200px;
-}
-</style>
+    <title>NickBox - Simple Python Multiboxer</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background-color: #f0f0f0;
+            padding: 10px;
+            text-align: center;
+        }
+        nav {
+            background-color: #e0e0e0;
+            padding: 10px;
+            text-align: center;
+        }
+        nav a {
+            margin: 0 15px;
+            text-decoration: none;
+            color: #333;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: auto;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #f8f8f8;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .content {
+            flex: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        .img-logo {
+            max-width: 200px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #f8f8f8;
+            margin: 10% auto;
+            padding: 20px;
+            width: 70%;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+        #licenseModal pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
 </head>
 <body>
-
 <header>
     <img src="https://github.com/user-attachments/assets/5ffecc35-27b9-45e4-8aca-dff1ba751f30" alt="NickBox Logo" class="img-logo">
 </header>
-
 <nav>
-    <a href="#">Home</a>
-    <a href="youtube.com">Demos</a>
+    <a href="#" onclick="loadHomePage()">Home</a>
+    <a href="https://youtube.com" target="_blank">Demos</a>
     <a href="#" onclick="loadDownloads()">Downloads</a>
-    <a href="https://www.google.com/">FAQ</a>
-    <a href="LICENSE">License</a>
+    <a href="https://www.google.com/" target="_blank">FAQ</a>
+    <a href="#" onclick="showLicense()">License</a>
 </nav>
-
 <div class="main-content">
-    <div class="sidebar">
-        <h2>Features</h2>
-        <h2>Limitations</h2>
-        <h2>Example Scenario</h2>
+    <div class="sidebar" id="sidebar">
+        <!-- Will be populated dynamically -->
     </div>
     <div class="content" id="mainContent">
-        <h2>Features</h2>
-        <ul>
-            <li><strong>Direct Input Broadcasting:</strong> Sends keyboard inputs to multiple windows simultaneously.</li>
-            <li><strong>Window Targeting:</strong> Works with any window with an identifiable name.</li>
-            <li><strong>Window Manipulation:</strong> Ability to make windows borderless, resize them, and more.</li>
-            <li><strong>Simple Setup:</strong> Easy to configure and use.</li>
-            <li><strong>Universal:</strong> Works with all windows that listen for key input while not focused.</li>
-        </ul>
+        <!-- Content will be loaded dynamically -->
+        <div id="loadingIndicator">Loading content...</div>
+    </div>
+</div>
 
-        <h2>Limitations</h2>
-        <ul>
-            <li>Not suitable for applications requiring round-robin input.</li>
-            <li>Not suitable for applications that disallow direct input broadcasting.</li>
-        </ul>
-
-        <h2>Example Scenario</h2>
-        <p>Quadraboxing World of Warcraft 3.3.5a.</p>
-        <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing">
+<!-- License Modal -->
+<div id="licenseModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeLicense()">&times;</span>
+        <h2>License</h2>
+        <pre id="licenseContent">Loading license...</pre>
     </div>
 </div>
 
 <script>
-function loadDownloads() {
-    fetch('https://api.github.com/repos/mostlynick3/NickBox-simple-Python-multiboxer/releases')
-        .then(response => response.json())
-        .then(data => {
+    // Repository information
+    const repoOwner = 'mostlynick3';
+    const repoName = 'NickBox-simple-Python-multiboxer';
+    
+    // Function to fetch and parse markdown content
+    async function fetchMarkdown(path) {
+        try {
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            // GitHub API returns content as base64 encoded
+            const content = atob(data.content);
+            return content;
+        } catch (error) {
+            console.error(`Error fetching ${path}:`, error);
+            return `Failed to load ${path}. Error: ${error.message}`;
+        }
+    }
+    
+    // Simple markdown parser
+    function parseMarkdown(markdown) {
+        let html = markdown
+            // Headers
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // Bold
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // Italic
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Lists
+            .replace(/^\- (.*$)/gim, '<li>$1</li>')
+            // Links
+            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // Wrap list items in ul tags
+        html = html.replace(/<li>.*?<\/li>/gs, match => {
+            return `<ul>${match}</ul>`;
+        });
+        
+        // Convert line breaks to paragraphs
+        const paragraphs = html.split(/\n\s*\n/);
+        html = paragraphs.map(p => {
+            if (!p.trim().startsWith('<')) {
+                return `<p>${p.trim()}</p>`;
+            }
+            return p;
+        }).join('\n');
+        
+        return html;
+    }
+    
+    // Load homepage (README.md content)
+    async function loadHomePage() {
+        document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading content...</div>';
+        
+        try {
+            const readmeContent = await fetchMarkdown('README.md');
+            const parsedContent = parseMarkdown(readmeContent);
+            
+            // Update main content
+            document.getElementById('mainContent').innerHTML = parsedContent;
+            
+            // Extract sections for sidebar
+            updateSidebar(readmeContent);
+        } catch (error) {
+            document.getElementById('mainContent').innerHTML = `<p>Error loading content: ${error.message}</p>`;
+        }
+    }
+    
+    // Update sidebar based on README headers
+    function updateSidebar(markdown) {
+        const headers = [];
+        const matches = markdown.match(/^##\s+(.*)$/gm);
+        
+        if (matches) {
+            const sidebarContent = matches.map(match => {
+                const header = match.replace(/^##\s+/, '').trim();
+                return `<h2><a href="#" onclick="scrollToSection('${header}')">${header}</a></h2>`;
+            }).join('');
+            
+            document.getElementById('sidebar').innerHTML = sidebarContent;
+        } else {
+            document.getElementById('sidebar').innerHTML = '<h2>Features</h2><h2>Limitations</h2><h2>Example Scenario</h2>';
+        }
+    }
+    
+    // Scroll to section
+    function scrollToSection(sectionTitle) {
+        const elements = document.querySelectorAll('h2');
+        for (const element of elements) {
+            if (element.textContent === sectionTitle) {
+                element.scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+        }
+    }
+    
+    // Load downloads
+    async function loadDownloads() {
+        document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading downloads...</div>';
+        
+        try {
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            
+            if (data.length === 0) {
+                document.getElementById('mainContent').innerHTML = '<h2>Downloads</h2><p>No releases available yet.</p>';
+                return;
+            }
+            
             let downloadsContent = '<h2>Downloads</h2><ul>';
             data.forEach(release => {
-                downloadsContent += `<li><strong>${release.name}</strong><br>`;
-                release.assets.forEach(asset => {
-                    downloadsContent += `<a href="${asset.browser_download_url}">${asset.name}</a><br>`;
-                });
+                downloadsContent += `<li>
+                    <h3>${release.name || 'Release ' + release.tag_name}</h3>
+                    <p>${release.body || 'No description available'}</p>
+                    <p>Released on: ${new Date(release.published_at).toLocaleDateString()}</p>`;
+                
+                if (release.assets.length > 0) {
+                    downloadsContent += '<p>Download links:</p><ul>';
+                    release.assets.forEach(asset => {
+                        downloadsContent += `<li><a href="${asset.browser_download_url}" target="_blank">${asset.name}</a> (${Math.round(asset.size/1024)} KB, ${asset.download_count} downloads)</li>`;
+                    });
+                    downloadsContent += '</ul>';
+                } else {
+                    downloadsContent += '<p>No downloadable assets available.</p>';
+                }
+                
                 downloadsContent += '</li>';
             });
             downloadsContent += '</ul>';
+            
             document.getElementById('mainContent').innerHTML = downloadsContent;
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('Error fetching releases:', error);
-            document.getElementById('mainContent').innerHTML = '<p>Failed to load downloads.</p>';
-        });
-}
+            document.getElementById('mainContent').innerHTML = `<h2>Downloads</h2><p>Failed to load downloads. Error: ${error.message}</p>`;
+        }
+    }
+    
+    // Show license modal
+    async function showLicense() {
+        document.getElementById('licenseContent').textContent = 'Loading license...';
+        document.getElementById('licenseModal').style.display = 'block';
+        
+        try {
+            const licenseContent = await fetchMarkdown('LICENSE');
+            document.getElementById('licenseContent').textContent = licenseContent;
+        } catch (error) {
+            document.getElementById('licenseContent').textContent = `Failed to load license. Error: ${error.message}`;
+        }
+    }
+    
+    // Close license modal
+    function closeLicense() {
+        document.getElementById('licenseModal').style.display = 'none';
+    }
+    
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+        const modal = document.getElementById('licenseModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // Load home page on initial load
+    document.addEventListener('DOMContentLoaded', loadHomePage);
 </script>
-
 </body>
 </html>
