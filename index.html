@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>NickBox - Simple Python Multiboxer</title>
+    <link rel="icon" type="image/x-icon" href="media/favicon.ico">
     <style>
         body {
             font-family: sans-serif;
@@ -55,20 +56,6 @@
         }
         .video-container {
             margin-bottom: 20px;
-        }
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        .video-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .video-item video {
-            width: 100%;
-            max-width: 400px; /* Adjust the max-width as needed */
         }
         .code-modal {
             display: none;
@@ -159,26 +146,23 @@
 <script>
     // Repository information
     const repoOwner = 'mostlynick3';
-    const repoName = 'NickBox-simple-Python-multiboxer';
-    const mainBranch = 'main'; // For NickBox.py and other main content
-    const webBranch = 'web';   // For web-specific content
-
-    // Function to fetch and parse content from specific branch
-    async function fetchContent(path, branch = mainBranch) {
-        try {
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}?ref=${branch}`);
-            if (!response.ok) throw new Error('Network response was not ok');
-
-            const data = await response.json();
-            // GitHub API returns content as base64 encoded
-            const content = atob(data.content);
-            return content;
-        } catch (error) {
-            console.error(`Error fetching ${path} from ${branch}:`, error);
-            return `Failed to load ${path} from branch ${branch}. Error: ${error.message}`;
-        }
-    }
-
+    const repoName = 'NickBox';
+    const webBranch = 'web';  // Everything now references web branch
+    
+    // Function to fetch and parse content from web branch
+	async function fetchContent(path) {
+	    try {
+	        const response = await fetch(path);
+	        if (!response.ok) throw new Error('Network response was not ok');
+	
+	        const content = await response.text();
+	        return content;
+	    } catch (error) {
+	        console.error(`Error fetching ${path}:`, error);
+	        return `Failed to load ${path}. Error: ${error.message}`;
+	    }
+	}
+    
     // Enhanced markdown parser
     function parseMarkdown(markdown) {
         let html = markdown
@@ -194,12 +178,12 @@
             .replace(/^\* (.*$)/gim, '<li>$1</li>')
             // Links
             .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
-
+        
         // Wrap list items in ul tags
         html = html.replace(/<li>.*?<\/li>/gs, match => {
             return `<ul>${match}</ul>`;
         });
-
+        
         // Convert line breaks to paragraphs (excluding lists and headers)
         const paragraphs = html.split(/\n\s*\n/);
         html = paragraphs.map(p => {
@@ -208,44 +192,44 @@
             }
             return p;
         }).join('\n');
-
+        
         return html;
     }
-
-    // Load homepage (README.md content from main branch)
+    
+    // Load homepage (README.md content from web branch)
     async function loadHomePage() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading content...</div>';
-
+        
         try {
-            const readmeContent = await fetchContent('README.md', mainBranch);
+            const readmeContent = await fetchContent('README.md');
             let parsedContent = parseMarkdown(readmeContent);
-
+            
             // Update main content
             document.getElementById('mainContent').innerHTML = parsedContent;
-
+            
             // Extract sections for sidebar
             updateSidebar(readmeContent);
         } catch (error) {
             document.getElementById('mainContent').innerHTML = `<p>Error loading content: ${error.message}</p>`;
         }
     }
-
+    
     // Update sidebar based on README headers
     function updateSidebar(markdown) {
         const matches = markdown.match(/^##\s+(.*)$/gm);
-
+        
         if (matches) {
             const sidebarContent = matches.map(match => {
                 const header = match.replace(/^##\s+/, '').trim();
                 return `<h2><a href="#" onclick="scrollToSection('${header}')">${header}</a></h2>`;
             }).join('');
-
+            
             document.getElementById('sidebar').innerHTML = sidebarContent;
         } else {
-            document.getElementById('sidebar').innerHTML = '<h2>Features</h2><h2>Limitations</h2><h2>Example Scenario</h2>';
+            document.getElementById('sidebar').innerHTML = '<h2>Home</h2>';
         }
     }
-
+    
     // Scroll to section
     function scrollToSection(sectionTitle) {
         const elements = document.querySelectorAll('h2');
@@ -256,80 +240,47 @@
             }
         }
     }
-
-    // Load downloads
-    async function loadDownloads() {
-        document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading downloads...</div>';
-
-        try {
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases`);
-            if (!response.ok) throw new Error('Network response was not ok');
-
-            const data = await response.json();
-
-            if (data.length === 0) {
-                document.getElementById('mainContent').innerHTML = '<h2>Downloads</h2><p>No releases available yet.</p>';
-                return;
-            }
-
-            let downloadsContent = '<h2>Downloads</h2><ul>';
-            data.forEach(release => {
-                downloadsContent += `<li>
-                    <h3>${release.name || 'Release ' + release.tag_name}</h3>
-                    <p>${release.body || 'No description available'}</p>
-                    <p>Released on: ${new Date(release.published_at).toLocaleDateString()}</p>`;
-
-                if (release.assets.length > 0) {
-                    downloadsContent += '<p>Download links:</p><ul>';
-                    release.assets.forEach(asset => {
-                        downloadsContent += `<li><a href="${asset.browser_download_url}" target="_blank">${asset.name}</a> (${Math.round(asset.size/1024)} KB, ${asset.download_count} downloads)</li>`;
-                    });
-                    downloadsContent += '</ul>';
-                } else {
-                    downloadsContent += '<p>No downloadable assets available.</p>';
-                }
-
-                downloadsContent += '</li>';
-            });
-            downloadsContent += '</ul>';
-
-            document.getElementById('mainContent').innerHTML = downloadsContent;
-            document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
-        } catch (error) {
-            console.error('Error fetching releases:', error);
-            document.getElementById('mainContent').innerHTML = `<h2>Downloads</h2><p>Failed to load downloads. Error: ${error.message}</p>`;
-        }
-    }
-
+    
+	function loadDownloads() {
+	  const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases`;
+	
+	  document.getElementById('mainContent').innerHTML = `
+	    <p>You can find the latest releases on the GitHub releases page:</p>
+	    <a href="${releasesUrl}" target="_blank">GitHub Releases</a>
+	  `;
+	
+	  document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
+	}
+    
     // Load license content directly in the main content area
     async function loadLicense() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading license...</div>';
-
+        
         try {
-            const licenseContent = await fetchContent('LICENSE', mainBranch);
+            const licenseContent = await fetchContent('LICENSE');
             document.getElementById('mainContent').innerHTML = `<h2>License</h2><pre>${licenseContent}</pre>`;
             document.getElementById('sidebar').innerHTML = '<h2>License</h2>';
         } catch (error) {
             document.getElementById('mainContent').innerHTML = `<h2>License</h2><p>Failed to load license. Error: ${error.message}</p>`;
         }
     }
-
+    
     // Load FAQ content
     function loadFAQ() {
         const faqContent = `
             <h2>Frequently Asked Questions</h2>
-
+            
             <div class="faq-item">
                 <p>Open source development offers enhanced security through code transparency. When software is open source, anyone can inspect the code, making it more difficult for malicious features to be hidden. This collaborative approach often leads to better quality software as bugs are found and fixed by the community.</p>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How can I see the source code?</div>
                 <div class="faq-answer">
-                    <p>By going to NickBox.py in the main branch, or clicking <a href="#" onclick="viewSourceCode('NickBox.py', '${mainBranch}')">here</a> to view the main source code in a popup window.</p>
+                    <p>By going to NickBox.py in the main branch, or clicking <a href="https://github.com/mostlynick3/NickBox/blob/main/NickBox.py" target="_blank">here</a> to view the main source code in a new tab.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How can I compile this myself?</div>
                 <div class="faq-answer">
@@ -337,42 +288,42 @@
                     <pre>--clean --onefile --exclude-module=cv2 --exclude-module=numpy --exclude-module=PIL --exclude=libcrypto-3.dll --name="NickBox" --noconsole NickBox.py</pre>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">What does the 'Hide Taskbar' feature do?</div>
                 <div class="faq-answer">
                     <p>The 'Hide Taskbar' feature, controlled by the hide_taskbar_var boolean variable, allows you to hide the Windows taskbar for all targeted windows. This gives you a cleaner view when multiboxing by removing the taskbar from all application windows.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How does the grid snapping work?</div>
                 <div class="faq-answer">
                     <p>Grid snapping is enabled by default (grid_snap_enabled = True) with a default snap size of 20 pixels (grid_snap_size = 20). When enabled, windows will snap to an invisible grid when being repositioned, making it easier to align multiple windows precisely.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">What is the purpose of the 'broadcast_all_keys' setting?</div>
                 <div class="faq-answer">
                     <p>When broadcast_all_keys is set to True, all keyboard inputs will be sent to all target windows. When set to False, only specific keys (defined in your keys.csv file) will be broadcasted. This allows for more selective control when multiboxing.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How does auto-focusing work?</div>
                 <div class="faq-answer">
                     <p>The auto-focusing feature (controlled by is_auto_focusing) automatically rotates focus between your target windows, allowing for round-robin input when needed. This can be paused temporarily (is_auto_focusing_paused) when you need to maintain focus on a specific window.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">What happens during an Alt+Tab?</div>
                 <div class="faq-answer">
                     <p>NickBox detects Alt+Tab keystrokes (alt_tab_pressed) and temporarily pauses broadcasting for a short duration (alt_tab_pause_time = 1 second) to allow you to switch between windows without causing unintended behaviors in your target applications.</p>
                 </div>
             </div>
-
+            
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">Can I save different window configurations?</div>
                 <div class="faq-answer">
@@ -380,50 +331,49 @@
                 </div>
             </div>
         `;
-
+        
         document.getElementById('mainContent').innerHTML = faqContent;
         document.getElementById('sidebar').innerHTML = '<h2>FAQ</h2>';
     }
+    
 
     function loadDemos() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
-
+        
         // Base path for demos directory
         const demosPath = 'media/demos/';
-
+        
         let demosContent = '<h2>Demo Videos</h2>';
-
+        
         // Videos section FIRST
         demosContent += '<div class="video-grid">';
-
-        // Try to load common video formats for known demos
+        
         const videoNames = ['demo-scaling', 'demo-startup'];
-        const videoExtensions = ['.mp4', '.webm', '.ogg'];
-
+        const videoExtensions = ['.mp4'];
+        
         videoNames.forEach(videoName => {
             const formattedName = videoName
                 .replace(/-|_/g, ' ')
                 .replace(/\b\w/g, l => l.toUpperCase());
-
+            
             demosContent += `
             <div class="video-item">
                 <h3>${formattedName}</h3>
-                <video controls>`;
-
+                <video controls width="100%">`;
+                
             // Try different formats, browser will use the first one that works
             videoExtensions.forEach(ext => {
                 demosContent += `<source src="${demosPath}${videoName}${ext}" type="video/${ext.substring(1)}">`;
             });
-
+            
             demosContent += `
                     Your browser does not support these video formats.
                 </video>
             </div>`;
         });
-
+        
         demosContent += '</div>';
-
-        // COMPLETELY SEPARATE section for images AFTER videos
+        
         demosContent += `
         <div class="images-section">
             <h2>Screenshot Examples</h2>
@@ -432,91 +382,36 @@
                 <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
             </div>
         </div>`;
-
+        
         document.getElementById('mainContent').innerHTML = demosContent;
         document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
-
-        // Alternative approach: scan for potential video files
-        checkForAdditionalVideos();
     }
-
-    // Function to check for additional videos beyond known ones
-    function checkForAdditionalVideos() {
-        const demosPath = 'media/demos/';
-        const potentialVideos = [
-            'demo-controls', 'demo-features', 'demo-overview',
-            'multibox-example', 'wow-demo', 'nickbox-intro'
-        ];
-        const videoGrid = document.querySelector('.video-grid');
-
-        if (!videoGrid) return;
-
-        potentialVideos.forEach(name => {
-            // Try to load the video
-            const video = document.createElement('video');
-            video.controls = true;
-            video.style.display = 'none'; // Hide until we know it exists
-
-            const source = document.createElement('source');
-            source.src = `${demosPath}${name}.mp4`;
-            source.type = 'video/mp4';
-
-            video.appendChild(source);
-
-            // Add handlers to manage video discovery
-            video.addEventListener('loadeddata', () => {
-                // Video exists and loaded
-                const formattedName = name
-                    .replace(/-|_/g, ' ')
-                    .replace(/\b\w/g, l => l.toUpperCase());
-
-                const videoItem = document.createElement('div');
-                videoItem.className = 'video-item';
-                videoItem.innerHTML = `
-                    <h3>${formattedName}</h3>
-                `;
-
-                video.style.display = 'block';
-                video.width = '100%';
-                videoItem.appendChild(video);
-                videoGrid.appendChild(videoItem);
-            });
-
-            video.addEventListener('error', () => {
-                // Video doesn't exist or couldn't load, do nothing
-                video.remove();
-            });
-
-            // Start loading to check if file exists
-            document.body.appendChild(video);
-        });
-    }
-
+    
     // View source code in modal
-    async function viewSourceCode(filename, branch = mainBranch) {
+    async function viewSourceCode(filename) {
         document.getElementById('codeModalTitle').textContent = filename;
         document.getElementById('codeModalContent').textContent = 'Loading source code...';
         document.getElementById('codeModal').style.display = 'block';
-
+        
         try {
-            const sourceCode = await fetchContent(filename, branch);
+            const sourceCode = await fetchContent(filename);
             document.getElementById('codeModalContent').textContent = sourceCode;
         } catch (error) {
             document.getElementById('codeModalContent').textContent = `Failed to load source code: ${error.message}`;
         }
     }
-
+    
     // Close code modal
     function closeCodeModal() {
         document.getElementById('codeModal').style.display = 'none';
     }
-
+    
     // Toggle FAQ answer visibility
     function toggleAnswer(element) {
         const answer = element.nextElementSibling;
         answer.style.display = answer.style.display === 'none' ? 'block' : 'none';
     }
-
+    
     // Close modal when clicking outside of it
     window.onclick = function(event) {
         const modal = document.getElementById('codeModal');
@@ -524,14 +419,14 @@
             modal.style.display = 'none';
         }
     }
-
+    
     // Initialize all FAQ answers to be visible
     document.addEventListener('DOMContentLoaded', function() {
         const answers = document.querySelectorAll('.faq-answer');
         answers.forEach(answer => {
             answer.style.display = 'block';
         });
-
+        
         // Load home page
         loadHomePage();
     });
