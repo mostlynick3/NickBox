@@ -370,17 +370,15 @@
         document.getElementById('mainContent').innerHTML = faqContent;
         document.getElementById('sidebar').innerHTML = '<h2>FAQ</h2>';
     }
-    
     function loadDemos() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
         
         // Base path for demos directory
         const demosPath = 'media/demos/';
         
-        // Add a fetch request to a json file or try multiple potential video files
         let demosContent = '<h2>Demo Videos</h2>';
-          
-        // Create a grid for videos only first
+        
+        // Videos section FIRST
         demosContent += '<div class="video-grid">';
         
         // Try to load common video formats for known demos
@@ -408,38 +406,17 @@
             </div>`;
         });
         
-        // Close the video grid
         demosContent += '</div>';
         
-        // Now add the image content separately after videos
+        // COMPLETELY SEPARATE section for images AFTER videos
         demosContent += `
-        <h2>Demo Screenshots</h2>
-        <div>
-            <h3>World of Warcraft Multiboxing Example</h3>
-            <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+        <div class="images-section">
+            <h2>Screenshot Examples</h2>
+            <div class="image-container">
+                <h3>World of Warcraft Multiboxing Example</h3>
+                <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+            </div>
         </div>`;
-        
-        // Add CSS for the grid
-        const style = document.createElement('style');
-        style.textContent = `
-            .video-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                gap: 20px;
-                margin-top: 20px;
-                margin-bottom: 30px;
-            }
-            .video-item {
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                padding: 10px;
-                background: #f9f9f9;
-            }
-            .video-item h3 {
-                margin-top: 0;
-            }
-        `;
-        document.head.appendChild(style);
         
         document.getElementById('mainContent').innerHTML = demosContent;
         document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
