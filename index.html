@@ -290,11 +290,14 @@
     function loadFAQ() {
         const faqContent = `
             <h2>Frequently Asked Questions</h2>
-            
+	    
             <div class="faq-item">
-                <p>Open source development offers enhanced security through code transparency. When software is open source, anyone can inspect the code, making it more difficult for malicious features to be hidden. This collaborative approach often leads to better quality software as bugs are found and fixed by the community.</p>
+                <div class="faq-question" onclick="toggleAnswer(this)">Is this project open source? If so, can I download the source code and make my own edits to it, or report issues/feature request on GitHub for further development?</div>
+                <div class="faq-answer">
+                    <p>Yes, yes, and yes. Open source development offers enhanced security through code transparency. When software is open source, anyone can inspect the code, making it more difficult for malicious features to be hidden. This collaborative approach often leads to better quality software as bugs are found and fixed by the community.</p>
+                </div>
             </div>
-            
+	    
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How can I see the source code?</div>
                 <div class="faq-answer">
@@ -309,39 +312,39 @@
                     <pre>--clean --onefile --exclude-module=cv2 --exclude-module=numpy --exclude-module=PIL --exclude=libcrypto-3.dll --name="NickBox" --noconsole NickBox.py</pre>
                 </div>
             </div>
-            
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleAnswer(this)">Why should I use this project instead of ISBoxer, WoW Open Box or OpenMultiboxing?</div>
+                <div class="faq-answer">
+                    <p>Like WoW Open Box and OpenMultiboxing, NickBox is free. ISBoxer is not. The project is entirely contained in one single .py file and has no hidden code or external communication built into it, as opposed to ISBoxer and other private code bases. NickBox lacks some features of WoW Open Box and forks like OpenMultiboxing, but in turn NickBox supports both auto mouse focus and broadcasting simultaneously. While advanced users may miss some features, NickBox is designed to be quick, easy, plug-and-play, and non-disruptive once you have set up your windows and started broadcasting.</p>
+                </div>
+            </div>
+	    
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">What does the 'Hide Taskbar' feature do?</div>
                 <div class="faq-answer">
-                    <p>The 'Hide Taskbar' feature, controlled by the hide_taskbar_var boolean variable, allows you to hide the Windows taskbar for all targeted windows. This gives you a cleaner view when multiboxing by removing the taskbar from all application windows.</p>
+                    <p>The 'Hide Taskbar' feature allows you to hide the Windows taskbar only when you are focusing the windows you intend to broadcast to, letting you expand the size of your windows to your full screen size.</p>
                 </div>
             </div>
             
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How does the grid snapping work?</div>
                 <div class="faq-answer">
-                    <p>Grid snapping is enabled by default (grid_snap_enabled = True) with a default snap size of 20 pixels (grid_snap_size = 20). When enabled, windows will snap to an invisible grid when being repositioned, making it easier to align multiple windows precisely.</p>
-                </div>
-            </div>
-            
-            <div class="faq-item">
-                <div class="faq-question" onclick="toggleAnswer(this)">What is the purpose of the 'broadcast_all_keys' setting?</div>
-                <div class="faq-answer">
-                    <p>When broadcast_all_keys is set to True, all keyboard inputs will be sent to all target windows. When set to False, only specific keys (defined in your keys.csv file) will be broadcasted. This allows for more selective control when multiboxing.</p>
+                    <p>Grid snapping is enabled by defaul with a default snap size of 50 pixels. When enabled, windows will snap to an invisible grid when being repositioned, making it easier to align multiple windows precisely.</p>
                 </div>
             </div>
             
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How does auto-focusing work?</div>
                 <div class="faq-answer">
-                    <p>The auto-focusing feature (controlled by is_auto_focusing) automatically rotates focus between your target windows, allowing for round-robin input when needed. This can be paused temporarily (is_auto_focusing_paused) when you need to maintain focus on a specific window.</p>
+                    <p>The auto-focusing feature automatically focuses and places the selected windows on top of other content, if parts of them are hovered over. This does not override normal window behavior, and is not active in other windows than the target windows.</p>
                 </div>
             </div>
             
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">What happens during an Alt+Tab?</div>
                 <div class="faq-answer">
-                    <p>NickBox detects Alt+Tab keystrokes (alt_tab_pressed) and temporarily pauses broadcasting for a short duration (alt_tab_pause_time = 1 second) to allow you to switch between windows without causing unintended behaviors in your target applications.</p>
+                    <p>If auto focus is enabled, Alt+Tab's overlay will compete with the selected windows' auto focus. NickBox can detect Alt+Tab keystrokes and temporarily pause broadcasting during this to allow you to switch between windows without causing unintended behaviors in your target applications.</p>
                 </div>
             </div>
             
