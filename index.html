@@ -279,18 +279,16 @@
         
         try {
             const licenseContent = await fetchContent('LICENSE');
-            document.getElementById('mainContent').innerHTML = `<h2>License</h2><pre>${licenseContent}</pre>`;
+            document.getElementById('mainContent').innerHTML = `<pre><center>${licenseContent}</center></pre>`;
             document.getElementById('sidebar').innerHTML = '<h2>License</h2>';
         } catch (error) {
-            document.getElementById('mainContent').innerHTML = `<h2>License</h2><p>Failed to load license. Error: ${error.message}</p>`;
+            document.getElementById('mainContent').innerHTML = `<p>Failed to load license. Error: ${error.message}</p>`;
         }
     }
     
     // Load FAQ content
     function loadFAQ() {
         const faqContent = `
-            <h2>Frequently Asked Questions</h2>
-	    
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">Is this project open source? If so, can I download the source code and make my own edits to it, or report issues/feature request on GitHub for further development?</div>
                 <div class="faq-answer">
@@ -316,7 +314,7 @@
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">Why should I use this project instead of ISBoxer, WoW Open Box or OpenMultiboxing?</div>
                 <div class="faq-answer">
-                    <p>Like WoW Open Box and OpenMultiboxing, NickBox is free. ISBoxer is not. The project is entirely contained in one single .py file and has no hidden code or external communication built into it, as opposed to ISBoxer and other private code bases. NickBox lacks some features of WoW Open Box and forks like OpenMultiboxing, but in turn NickBox supports both auto mouse focus and broadcasting simultaneously. While advanced users may miss some features, NickBox is designed to be quick, easy, plug-and-play, and non-disruptive once you have set up your windows and started broadcasting.</p>
+                    <p>Like WoW Open Box and OpenMultiboxing, NickBox is free. ISBoxer is not. The project is entirely contained in one single .py file and has no hidden code or external communication built into it, as opposed to ISBoxer and other private code bases. NickBox lacks some features of WoW Open Box and forks like OpenMultiboxing, but in turn NickBox supports both auto mouse focus and keyboard broadcasting simultaneously. While advanced users may miss some features, NickBox is designed to be quick, easy, plug-and-play, and non-disruptive once you have set up your windows and started broadcasting.</p>
                 </div>
             </div>
 	    
