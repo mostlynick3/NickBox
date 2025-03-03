@@ -279,7 +279,7 @@
         
         try {
             const licenseContent = await fetchContent('LICENSE');
-            document.getElementById('mainContent').innerHTML = `<pre><center>${licenseContent}</center></pre>`;
+            document.getElementById('mainContent').innerHTML = `<pre>${licenseContent}</pre>`;
             document.getElementById('sidebar').innerHTML = '<h2>License</h2>';
         } catch (error) {
             document.getElementById('mainContent').innerHTML = `<p>Failed to load license. Error: ${error.message}</p>`;
