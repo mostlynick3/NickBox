@@ -25,6 +25,6 @@ Download the precompiled `.exe` binary here: [https://github.com/mostlynick3/Nic
 
 Quadraboxing World of Warcraft 3.3.5a.
 
-![image](https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2)
+<img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2">
 
 **License:** GPL-3.0
