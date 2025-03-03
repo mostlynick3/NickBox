@@ -27,6 +27,7 @@ Quadraboxing World of Warcraft 3.3.5a.
 
 
 <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2">
-
+<br>
+<br>
 
 **License:** GPL-3.0
