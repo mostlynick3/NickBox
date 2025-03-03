@@ -379,14 +379,7 @@
         
         // Add a fetch request to a json file or try multiple potential video files
         let demosContent = '<h2>Demo Videos</h2>';
-        
-        // Always display the WoW Multiboxing image first
-        demosContent += `
-        <div>
-            <h3>World of Warcraft Multiboxing Example</h3>
-            <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
-        </div>`;
-        
+          
         // Create a grid for videos
         demosContent += '<div class="video-grid">';
         
@@ -415,6 +408,11 @@
             </div>`;
         });
         
+        demosContent += `
+        <div>
+            <h3>World of Warcraft Multiboxing Example</h3>
+            <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+        </div>`;
         // Close the grid
         demosContent += '</div>';
         
