@@ -48,6 +48,11 @@
         .img-logo {
             max-width: 200px;
         }
+        .demo-image {
+            max-width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
         .video-container {
             margin-bottom: 20px;
         }
@@ -99,6 +104,12 @@
             margin-top: 10px;
             margin-left: 20px;
         }
+        ul {
+            padding-left: 20px;
+        }
+        ul li {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -135,11 +146,13 @@
     // Repository information
     const repoOwner = 'mostlynick3';
     const repoName = 'NickBox-simple-Python-multiboxer';
+    const mainBranch = 'main'; // For NickBox.py and other main content
+    const webBranch = 'web';   // For web-specific content
     
-    // Function to fetch and parse markdown content
-    async function fetchMarkdown(path) {
+    // Function to fetch and parse content from specific branch
+    async function fetchContent(path, branch = mainBranch) {
         try {
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`);
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}?ref=${branch}`);
             if (!response.ok) throw new Error('Network response was not ok');
             
             const data = await response.json();
@@ -147,12 +160,12 @@
             const content = atob(data.content);
             return content;
         } catch (error) {
-            console.error(`Error fetching ${path}:`, error);
-            return `Failed to load ${path}. Error: ${error.message}`;
+            console.error(`Error fetching ${path} from ${branch}:`, error);
+            return `Failed to load ${path} from branch ${branch}. Error: ${error.message}`;
         }
     }
     
-    // Simple markdown parser
+    // Enhanced markdown parser
     function parseMarkdown(markdown) {
         let html = markdown
             // Headers
@@ -163,8 +176,8 @@
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             // Italic
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Lists
-            .replace(/^\- (.*$)/gim, '<li>$1</li>')
+            // Bullet lists
+            .replace(/^\* (.*$)/gim, '<li>$1</li>')
             // Links
             .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
         
@@ -173,7 +186,7 @@
             return `<ul>${match}</ul>`;
         });
         
-        // Convert line breaks to paragraphs
+        // Convert line breaks to paragraphs (excluding lists and headers)
         const paragraphs = html.split(/\n\s*\n/);
         html = paragraphs.map(p => {
             if (!p.trim().startsWith('<')) {
@@ -185,13 +198,13 @@
         return html;
     }
     
-    // Load homepage (README.md content)
+    // Load homepage (README.md content from main branch)
     async function loadHomePage() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading content...</div>';
         
         try {
-            const readmeContent = await fetchMarkdown('README.md');
-            const parsedContent = parseMarkdown(readmeContent);
+            const readmeContent = await fetchContent('README.md', mainBranch);
+            let parsedContent = parseMarkdown(readmeContent);
             
             // Update main content
             document.getElementById('mainContent').innerHTML = parsedContent;
@@ -205,7 +218,6 @@
     
     // Update sidebar based on README headers
     function updateSidebar(markdown) {
-        const headers = [];
         const matches = markdown.match(/^##\s+(.*)$/gm);
         
         if (matches) {
@@ -280,7 +292,7 @@
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading license...</div>';
         
         try {
-            const licenseContent = await fetchMarkdown('LICENSE');
+            const licenseContent = await fetchContent('LICENSE', mainBranch);
             document.getElementById('mainContent').innerHTML = `<h2>License</h2><pre>${licenseContent}</pre>`;
             document.getElementById('sidebar').innerHTML = '<h2>License</h2>';
         } catch (error) {
@@ -300,7 +312,7 @@
             <div class="faq-item">
                 <div class="faq-question" onclick="toggleAnswer(this)">How can I see the source code?</div>
                 <div class="faq-answer">
-                    <p>By going to main.py or clicking <a href="#" onclick="viewSourceCode('NickBox.py')">here</a> to view the main source code in a popup window.</p>
+                    <p>By going to main.py or clicking <a href="#" onclick="viewSourceCode('NickBox.py', '${mainBranch}')">here</a> to view the main source code in a popup window.</p>
                 </div>
             </div>
             
@@ -364,11 +376,11 @@
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
         
         try {
-            // Try to fetch the media/demo directory content
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/media/demo`);
+            // Try to fetch the demos directory content
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/media/demos?ref=${mainBranch}`);
             
             if (!response.ok) {
-                throw new Error('Network response was not ok or demo directory not found');
+                throw new Error('Network response was not ok or demos directory not found');
             }
             
             const data = await response.json();
@@ -378,25 +390,31 @@
                 file.name.endsWith('.ogg')
             );
             
-            if (videoFiles.length === 0) {
-                document.getElementById('mainContent').innerHTML = '<h2>Demos</h2><p>No demo videos available.</p>';
-                return;
-            }
-            
             let demosContent = '<h2>Demo Videos</h2>';
             
-            videoFiles.forEach(video => {
-                const videoTitle = video.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-                
-                demosContent += `
-                <div class="video-container">
-                    <h3>${videoTitle}</h3>
-                    <video controls width="100%">
-                        <source src="${video.download_url}" type="video/${video.name.split('.').pop()}">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>`;
-            });
+            // Always display the WoW Multiboxing image first
+            demosContent += `
+            <div>
+                <h3>World of Warcraft Multiboxing Example</h3>
+                <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+            </div>`;
+            
+            if (videoFiles.length > 0) {
+                videoFiles.forEach(video => {
+                    const videoTitle = video.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+                    
+                    demosContent += `
+                    <div class="video-container">
+                        <h3>${videoTitle}</h3>
+                        <video controls width="100%">
+                            <source src="${video.download_url}" type="video/${video.name.split('.').pop()}">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>`;
+                });
+            } else {
+                demosContent += '<p>No additional demo videos available at this time.</p>';
+            }
             
             document.getElementById('mainContent').innerHTML = demosContent;
             document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
@@ -404,15 +422,14 @@
         } catch (error) {
             console.error('Error fetching demo videos:', error);
             
-            // Fallback to showing a sample video demo section
+            // Fallback to showing just the WoW image
             const fallbackContent = `
                 <h2>Demos</h2>
-                <p>Demo videos could not be loaded automatically. Please check the examples below:</p>
+                <p>Video demonstrations could not be loaded.</p>
                 
-                <div class="video-container">
-                    <h3>NickBox Multiboxing WoW Demo</h3>
-                    <p>This is an example of how NickBox would display video content when properly configured.</p>
-                    <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing">
+                <div>
+                    <h3>World of Warcraft Multiboxing Example</h3>
+                    <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
                 </div>`;
                 
             document.getElementById('mainContent').innerHTML = fallbackContent;
@@ -420,13 +437,13 @@
     }
     
     // View source code in modal
-    async function viewSourceCode(filename) {
+    async function viewSourceCode(filename, branch = mainBranch) {
         document.getElementById('codeModalTitle').textContent = filename;
         document.getElementById('codeModalContent').textContent = 'Loading source code...';
         document.getElementById('codeModal').style.display = 'block';
         
         try {
-            const sourceCode = await fetchMarkdown(filename);
+            const sourceCode = await fetchContent(filename, branch);
             document.getElementById('codeModalContent').textContent = sourceCode;
         } catch (error) {
             document.getElementById('codeModalContent').textContent = `Failed to load source code: ${error.message}`;
@@ -452,8 +469,16 @@
         }
     }
     
-    // Load home page on initial load
-    document.addEventListener('DOMContentLoaded', loadHomePage);
+    // Initialize all FAQ answers to be visible
+    document.addEventListener('DOMContentLoaded', function() {
+        const answers = document.querySelectorAll('.faq-answer');
+        answers.forEach(answer => {
+            answer.style.display = 'block';
+        });
+        
+        // Load home page
+        loadHomePage();
+    });
 </script>
 </body>
 </html>
