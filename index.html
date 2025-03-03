@@ -370,7 +370,7 @@
         document.getElementById('mainContent').innerHTML = faqContent;
         document.getElementById('sidebar').innerHTML = '<h2>FAQ</h2>';
     }
-    // Load demo videos
+    
     function loadDemos() {
         document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
         
@@ -380,7 +380,7 @@
         // Add a fetch request to a json file or try multiple potential video files
         let demosContent = '<h2>Demo Videos</h2>';
           
-        // Create a grid for videos
+        // Create a grid for videos only first
         demosContent += '<div class="video-grid">';
         
         // Try to load common video formats for known demos
@@ -389,8 +389,8 @@
         
         videoNames.forEach(videoName => {
             const formattedName = videoName
-                .replace(/-|_/g, ' ')  // Replace hyphens and underscores with spaces
-                .replace(/\b\w/g, l => l.toUpperCase());  // Capitalize each word
+                .replace(/-|_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
             
             demosContent += `
             <div class="video-item">
@@ -408,13 +408,16 @@
             </div>`;
         });
         
+        // Close the video grid
+        demosContent += '</div>';
+        
+        // Now add the image content separately after videos
         demosContent += `
+        <h2>Demo Screenshots</h2>
         <div>
             <h3>World of Warcraft Multiboxing Example</h3>
             <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
         </div>`;
-        // Close the grid
-        demosContent += '</div>';
         
         // Add CSS for the grid
         const style = document.createElement('style');
@@ -424,6 +427,7 @@
                 grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
                 gap: 20px;
                 margin-top: 20px;
+                margin-bottom: 30px;
             }
             .video-item {
                 border: 1px solid #ddd;
@@ -441,7 +445,6 @@
         document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
         
         // Alternative approach: scan for potential video files
-        // This will try to load various potential video files and show them if found
         checkForAdditionalVideos();
     }
     
