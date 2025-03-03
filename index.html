@@ -111,6 +111,24 @@
         ul li {
             margin-bottom: 10px;
         }
+	.video-container {
+	    display: flex;
+	    flex-wrap: wrap;
+	    gap: 20px;
+	    background-color: #f0f0f0; /* Unifying background color */
+	    padding: 20px;
+	    border-radius: 8px;
+	}
+	
+	.video-item {
+	    flex: 1 1 calc(50% - 20px); /* Adjust width to fit two videos per row */
+	    box-sizing: border-box;
+	}
+	
+	.video-item video {
+	    width: 100%;
+	    border: 1px solid #ddd;
+	}
     </style>
 </head>
 <body>
@@ -337,55 +355,56 @@
     }
     
 
-    function loadDemos() {
-        document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
-        
-        // Base path for demos directory
-        const demosPath = 'media/demos/';
-        
-        let demosContent = '<h2>Demo Videos</h2>';
-        
-        // Videos section FIRST
-        demosContent += '<div class="video-grid">';
-        
-        const videoNames = ['demo-scaling', 'demo-startup'];
-        const videoExtensions = ['.mp4'];
-        
-        videoNames.forEach(videoName => {
-            const formattedName = videoName
-                .replace(/-|_/g, ' ')
-                .replace(/\b\w/g, l => l.toUpperCase());
-            
-            demosContent += `
-            <div class="video-item">
-                <h3>${formattedName}</h3>
-                <video controls width="100%">`;
-                
-            // Try different formats, browser will use the first one that works
-            videoExtensions.forEach(ext => {
-                demosContent += `<source src="${demosPath}${videoName}${ext}" type="video/${ext.substring(1)}">`;
-            });
-            
-            demosContent += `
-                    Your browser does not support these video formats.
-                </video>
-            </div>`;
-        });
-        
-        demosContent += '</div>';
-        
-        demosContent += `
-        <div class="images-section">
-            <h2>Screenshot Examples</h2>
-            <div class="image-container">
-                <h3>World of Warcraft Multiboxing Example</h3>
-                <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
-            </div>
-        </div>`;
-        
-        document.getElementById('mainContent').innerHTML = demosContent;
-        document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
-    }
+	function loadDemos() {
+	    document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading demo videos...</div>';
+	
+	    // Base path for demos directory
+	    const demosPath = 'media/demos/';
+	
+	    let demosContent = '<h2>Demo Videos</h2>';
+	
+	    // Videos section
+	    demosContent += '<div class="video-container">';
+	
+	    const videoNames = ['demo-scaling', 'demo-startup'];
+	    const videoExtensions = ['.mp4'];
+	
+	    videoNames.forEach(videoName => {
+	        const formattedName = videoName
+	            .replace(/-|_/g, ' ')
+	            .replace(/\b\w/g, l => l.toUpperCase());
+	
+	        demosContent += `
+	        <div class="video-item">
+	            <h3>${formattedName}</h3>
+	            <video controls>`;
+	
+	        // Try different formats, browser will use the first one that works
+	        videoExtensions.forEach(ext => {
+	            demosContent += `<source src="${demosPath}${videoName}${ext}" type="video/${ext.substring(1)}">`;
+	        });
+	
+	        demosContent += `
+	                Your browser does not support these video formats.
+	            </video>
+	        </div>`;
+	    });
+	
+	    demosContent += '</div>';
+	
+	    demosContent += `
+	    <div class="images-section">
+	        <h2>Screenshot Examples</h2>
+	        <div class="image-container">
+	            <h3>World of Warcraft Multiboxing Example</h3>
+	            <img src="https://github.com/user-attachments/assets/f1b6c891-7a65-4ecd-b383-0986be51acf2" alt="WoW Multiboxing" class="demo-image">
+	        </div>
+	    </div>`;
+	
+	    document.getElementById('mainContent').innerHTML = demosContent;
+	    document.getElementById('sidebar').innerHTML = '<h2>Demos</h2>';
+	}
+
     
     // View source code in modal
     async function viewSourceCode(filename) {
