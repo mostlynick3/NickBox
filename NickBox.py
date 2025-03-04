@@ -990,12 +990,10 @@ class AutoKeyBroadcaster:
         screen_height = self.root.winfo_screenheight()
         window_count = len(target_windows)
         
-        # Handle main window mode
         use_main_window = self.use_main_window.get()
         main_window_idx = self.main_window_index.get() - 1  # Convert to 0-based index
         
         if use_main_window and 0 <= main_window_idx < window_count:
-            # Move the main window to the front of the list for processing
             main_window = target_windows.pop(main_window_idx)
             target_windows.insert(0, main_window)
             
@@ -1009,7 +1007,15 @@ class AutoKeyBroadcaster:
                 self.log(f"Unknown aspect ratio: {aspect_ratio}")
                 return
         else:
-            if aspect_ratio == "16:9":
+            if aspect_ratio == "1:1":
+                cols = int(window_count ** 0.5)
+                if cols * cols < window_count:
+                    cols += 1
+                rows = (window_count + cols - 1) // cols
+                cell_width = screen_width // cols
+                cell_height = screen_height // rows
+                cell_width = cell_height = min(cell_width, cell_height)
+            elif aspect_ratio == "16:9":
                 if window_count <= 3:
                     rows = 1
                     cols = window_count
