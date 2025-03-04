@@ -30,6 +30,8 @@ class AutoKeyBroadcaster:
         self.root.geometry("500x950")
         self.root.resizable(False, False)
         self.target_window_pattern = StringVar()
+        self.selected_monitor = StringVar()
+        self.monitor_info = MonitorInfo()
         self.is_broadcasting = False
         self.is_auto_focusing = False
         self.is_auto_focusing_paused = False
@@ -41,6 +43,8 @@ class AutoKeyBroadcaster:
         self.grid_snap_size = IntVar(value=20)
         self.window_snap_enabled = BooleanVar(value=True)
         self.corner_snap_enabled = BooleanVar(value=True)
+        self.use_main_window = BooleanVar(value=False)
+        self.main_window_index = IntVar(value=0)
         self.running = True
         self.broadcast_all_keys = BooleanVar(value=False)
         self.logging_enabled = BooleanVar(value=True)
@@ -61,6 +65,7 @@ class AutoKeyBroadcaster:
         self.resizing_window = None
         self.screen_scale = 0.1
         self.create_widgets()
+        self.window_list = self.get_all_windows()
         self.apply_profile_settings()
         self.root.update_idletasks()    
         self.root.after(500, self.update_window_visualization)
@@ -317,14 +322,7 @@ class AutoKeyBroadcaster:
             self.log(f"Set profile {profile_name} as default")
         else:
             self.log(f"Profile {profile_name} does not exist")
-
-    def get_all_windows(self):
-        all_windows = []
-        for window in gw.getAllWindows():
-            if window.title and window.title.strip():
-                all_windows.append(window.title)
-        return sorted(all_windows)
-
+                
     def create_widgets(self):
         # Profile Frame
         profile_frame = Frame(self.root)
@@ -355,10 +353,32 @@ class AutoKeyBroadcaster:
         # Select Frame
         select_frame = LabelFrame(self.root, text="Target Window")
         select_frame.pack(fill="x", expand=True, padx=10, pady=5)
+        # Inside the create_widgets method
+        self.monitor_names = [monitor['name'] for monitor in self.monitor_info.monitors]
+        self.selected_monitor = StringVar()
 
-        Label(select_frame, text="Select window:").pack(anchor="w", padx=5, pady=5)
-        self.window_combo = Combobox(select_frame, textvariable=self.target_window_pattern, values=self.window_list)
-        self.window_combo.pack(fill="x", padx=5, pady=5)
+        # Add a dropdown for monitor selection
+        line_frame_monitor = Frame(select_frame)
+        line_frame_monitor.pack(fill="x", padx=5, pady=5)
+        # Add the monitor label to the left
+        monitor_label = Label(line_frame_monitor, text="Select monitor:")
+        monitor_label.pack(side="left", padx=5)
+        # Add the monitor combobox to the right
+        monitor_combo = Combobox(line_frame_monitor, textvariable=self.selected_monitor, values=self.monitor_names)
+        monitor_combo.pack(side="right", fill="x", expand=True, padx=5)
+        monitor_combo.bind("<<ComboboxSelected>>", self.on_monitor_selected)
+        monitor_combo.current(0)  # Auto-select first monitor in list
+
+        line_frame = Frame(select_frame)
+        line_frame.pack(fill="x", padx=5, pady=5)
+        # Add the label to the left
+        label = Label(line_frame, text="Select window:")
+        label.pack(side="left", padx=5)
+        # Add the combobox to the right
+        self.window_combo = Combobox(line_frame, textvariable=self.target_window_pattern, values=self.window_list)
+        self.window_combo.pack(side="right", fill="x", expand=True, padx=5)
+
+        # Bind events
         self.window_combo.bind("<<ComboboxSelected>>", self.on_window_selected)
         self.window_combo.bind("<Button-1>", self.refresh_window_list)
 
@@ -487,13 +507,44 @@ class AutoKeyBroadcaster:
         
         snap_settings_frame = Frame(self.window_mgmt_frame)
         snap_settings_frame.pack(fill="x", padx=5, pady=2, before=self.viz_canvas)
-        
+
         Checkbutton(snap_settings_frame, text="Grid Snap", variable=self.grid_snap_enabled).pack(side=LEFT, padx=2)
         Label(snap_settings_frame, text="Grid Size:").pack(side=LEFT, padx=20)
         Spinbox(snap_settings_frame, from_=5, to=50, width=3, textvariable=self.grid_snap_size).pack(side=LEFT, padx=2)
         #ttk.Checkbutton(snap_settings_frame, text="Snap to Windows", variable=self.window_snap_enabled).pack(side=LEFT, padx=5)
         #ttk.Checkbutton(snap_settings_frame, text="Snap to Corners", variable=self.corner_snap_enabled).pack(side=LEFT, padx=5)
+
+        self.use_main_window_check = Checkbutton(snap_settings_frame, text="Use Main Window", 
+                                                 variable=self.use_main_window)
+        self.use_main_window_check.pack(side=RIGHT, padx=2)
+
         
+        self.main_window_combo = Combobox(snap_settings_frame, textvariable=self.main_window_index, 
+                                         values=[i for i in range(1, 9)], width=2)
+        self.main_window_combo.pack(side=RIGHT, padx=2)
+        self.main_window_combo.set("1")
+        self.main_window_combo.pack_forget() # Not sure where to display this yet
+
+    def get_all_windows(self):
+        all_windows = []
+        selected_monitor = self.get_selected_monitor()
+        for window in gw.getAllWindows():
+            if window.title and window.title.strip() and self.is_window_on_monitor(window, selected_monitor):
+                all_windows.append(window.title)
+        return sorted(all_windows)
+        
+    def get_selected_monitor(self):
+        monitor_name = self.selected_monitor.get()
+        return self.monitor_info.get_monitor_by_name(monitor_name)
+
+    def is_window_on_monitor(self, window, monitor):
+        if not monitor:
+            return False
+        return (window.left >= monitor['x'] and
+                window.right <= monitor['x'] + monitor['width'] and
+                window.top >= monitor['y'] and
+                window.bottom <= monitor['y'] + monitor['height'])
+                
     def sanitize_keys(self, keys_string):
         # Split input by commas
         raw_keys = [k.strip() for k in keys_string.split(',')]
@@ -549,8 +600,12 @@ class AutoKeyBroadcaster:
     def update_window_visualization(self):
         self.viz_canvas.delete("all")
         self.window_rects = {}
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        selected_monitor = self.get_selected_monitor()
+        if not selected_monitor:
+            return
+
+        screen_width = selected_monitor['width']
+        screen_height = selected_monitor['height']
         canvas_width = self.viz_canvas.winfo_width()
         canvas_height = self.viz_canvas.winfo_height()
 
@@ -570,46 +625,47 @@ class AutoKeyBroadcaster:
         target_windows.sort(key=lambda w: (w.top, w.left))
 
         for i, window in enumerate(target_windows):
-            color = colors[i % len(colors)]
-            x1 = window.left * self.screen_scale
-            y1 = window.top * self.screen_scale
-            x2 = window.right * self.screen_scale
-            y2 = window.bottom * self.screen_scale
-            rect_id = self.viz_canvas.create_rectangle(
-                x1, y1, x2, y2,
-                fill=color, outline="white", width=1,
-                tags=f"window_{i}"
-            )
+            if self.is_window_on_monitor(window, selected_monitor):
+                color = colors[i % len(colors)]
+                x1 = (window.left - selected_monitor['x']) * self.screen_scale
+                y1 = (window.top - selected_monitor['y']) * self.screen_scale
+                x2 = (window.right - selected_monitor['x']) * self.screen_scale
+                y2 = (window.bottom - selected_monitor['y']) * self.screen_scale
+                rect_id = self.viz_canvas.create_rectangle(
+                    x1, y1, x2, y2,
+                    fill=color, outline="white", width=1,
+                    tags=f"window_{i}"
+                )
 
-            # Add window number in top-left corner
-            self.viz_canvas.create_text(
-                x1 + 10, y1 + 10,
-                text=f"#{i+1}",
-                fill="white",
-                font=("Arial", 10, "bold"),
-                tags=f"window_{i}"
-            )
+                # Add window number in top-left corner
+                self.viz_canvas.create_text(
+                    x1 + 10, y1 + 10,
+                    text=f"#{i+1}",
+                    fill="white",
+                    font=("Arial", 10, "bold"),
+                    tags=f"window_{i}"
+                )
 
-            # Add window title in center
-            title = window.title if len(window.title) < 20 else window.title[:17] + "..."
-            self.viz_canvas.create_text(
-                (x1 + x2) / 2, (y1 + y2) / 2,
-                text=title, fill="white", font=("Arial", 8),
-                tags=f"window_{i}"
-            )
+                # Add window title in center
+                title = window.title if len(window.title) < 20 else window.title[:17] + "..."
+                self.viz_canvas.create_text(
+                    (x1 + x2) / 2, (y1 + y2) / 2,
+                    text=title, fill="white", font=("Arial", 8),
+                    tags=f"window_{i}"
+                )
 
-            resize_handle = self.viz_canvas.create_polygon(
-                x2, y2 - 10, x2 - 10, y2, x2, y2,
-                fill="white", outline="black", width=1,
-                tags=f"resize_{i}"
-            )
+                resize_handle = self.viz_canvas.create_polygon(
+                    x2, y2 - 10, x2 - 10, y2, x2, y2,
+                    fill="white", outline="black", width=1,
+                    tags=f"resize_{i}"
+                )
 
-            self.window_rects[rect_id] = {
-                "window": window,
-                "index": i,
-                "original_geometry": (window.left, window.top, window.right, window.bottom),
-                "resize_handle": resize_handle
-            }
+                self.window_rects[rect_id] = {
+                    "window": window,
+                    "index": i,
+                    "original_geometry": (window.left, window.top, window.right, window.bottom),
+                    "resize_handle": resize_handle
+                }
 
         if not target_windows:
             self.viz_canvas.create_text(
@@ -929,100 +985,352 @@ class AutoKeyBroadcaster:
         if not target_windows:
             self.log("No windows to layout")
             return
+        
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_count = len(target_windows)
-        if aspect_ratio == "1:1":
-            cols = int(window_count ** 0.5)
-            if cols * cols < window_count:
-                cols += 1
-            rows = (window_count + cols - 1) // cols
-            cell_width = screen_width // cols
-            cell_height = screen_height // rows
-            cell_width = cell_height = min(cell_width, cell_height)
-        elif aspect_ratio == "16:9":
-            if window_count <= 3:
-                rows = 1
-                cols = window_count
+        
+        # Handle main window mode
+        use_main_window = self.use_main_window.get()
+        main_window_idx = self.main_window_index.get() - 1  # Convert to 0-based index
+        
+        if use_main_window and 0 <= main_window_idx < window_count:
+            # Move the main window to the front of the list for processing
+            main_window = target_windows.pop(main_window_idx)
+            target_windows.insert(0, main_window)
+            
+            if aspect_ratio == "1:1":
+                self.layout_with_main_window_grid(target_windows, screen_width, screen_height)
+            elif aspect_ratio == "16:9":
+                self.layout_with_main_window_widescreen(target_windows, screen_width, screen_height, 16/9)
+            elif aspect_ratio == "21:9":
+                self.layout_with_main_window_widescreen(target_windows, screen_width, screen_height, 21/9)
             else:
-                rows = 2
-                cols = (window_count + 1) // 2
-            
-            # Calculate cell dimensions
-            cell_width = screen_width // cols
-            cell_height = screen_height // rows
-            
-            # Adjust to maintain 16:9 aspect ratio
-            if cell_width / cell_height > 16/9:
-                cell_width = int(cell_height * 16/9)
+                self.log(f"Unknown aspect ratio: {aspect_ratio}")
+                return
+        else:
+            if aspect_ratio == "16:9":
+                if window_count <= 3:
+                    rows = 1
+                    cols = window_count
+                else:
+                    rows = 2
+                    cols = (window_count + 1) // 2
+                
+                # Calculate cell dimensions
+                cell_width = screen_width // cols
+                cell_height = screen_height // rows
+                
+                # Adjust to maintain 16:9 aspect ratio
+                if cell_width / cell_height > 16/9:
+                    cell_width = int(cell_height * 16/9)
+                else:
+                    cell_height = int(cell_width * 9/16)
+                
+                # Calculate padding to center windows
+                padding_x = (screen_width - (cols * cell_width)) // 2
+                padding_y = (screen_height - (rows * cell_height)) // 2
+                
+                # Position windows
+                for i, window in enumerate(target_windows):
+                    row = i // cols
+                    col = i % cols
+                    x = padding_x + (col * cell_width)
+                    y = padding_y + (row * cell_height)
+                    try:
+                        window.moveTo(x, y)
+                        window.resizeTo(cell_width, cell_height)
+                    except Exception as e:
+                        self.log(f"Error arranging window: {str(e)}")         
+            elif aspect_ratio == "21:9":
+                cols = int((window_count * 21 / 9) ** 0.5)
+                if cols == 0:
+                    cols = 1
+                rows = (window_count + cols - 1) // cols
+                cell_width = screen_width // cols
+                cell_height = int(cell_width * 9 / 21)
             else:
-                cell_height = int(cell_width * 9/16)
-            
-            # Calculate padding to center windows
-            padding_x = (screen_width - (cols * cell_width)) // 2
-            padding_y = (screen_height - (rows * cell_height)) // 2
-            
-            # Position windows
+                self.log(f"Unknown aspect ratio: {aspect_ratio}")
+                return
             for i, window in enumerate(target_windows):
                 row = i // cols
                 col = i % cols
-                x = padding_x + (col * cell_width)
-                y = padding_y + (row * cell_height)
+                x = col * cell_width
+                y = row * cell_height
                 try:
                     window.moveTo(x, y)
                     window.resizeTo(cell_width, cell_height)
                 except Exception as e:
-                    self.log(f"Error arranging window: {str(e)}")         
-        elif aspect_ratio == "21:9":
-            cols = int((window_count * 21 / 9) ** 0.5)
-            if cols == 0:
-                cols = 1
-            rows = (window_count + cols - 1) // cols
-            cell_width = screen_width // cols
-            cell_height = int(cell_width * 9 / 21)
-        else:
-            self.log(f"Unknown aspect ratio: {aspect_ratio}")
-            return
-        for i, window in enumerate(target_windows):
-            row = i // cols
-            col = i % cols
-            x = col * cell_width
-            y = row * cell_height
-            try:
-                window.moveTo(x, y)
-                window.resizeTo(cell_width, cell_height)
-            except Exception as e:
-                self.log(f"Error arranging window: {str(e)}")
-        self.log(f"Arranged {window_count} windows in {rows}x{cols} grid ({aspect_ratio})")
+                    self.log(f"Error arranging window: {str(e)}")
+                    
         self.update_window_visualization()
+    def layout_with_main_window_grid(self, target_windows, screen_width, screen_height):
+        if not target_windows:
+            return
+            
+        window_count = len(target_windows)
+        main_window = target_windows[0]
+        secondary_windows = target_windows[1:]
+        secondary_count = len(secondary_windows)
+        
+        # Main window takes 2/3 of screen width and height
+        main_width = int(screen_width * 0.6)
+        main_height = int(screen_height * 0.6)
+        
+        # Position main window in upper left
+        try:
+            main_window.moveTo(0, 0)
+            main_window.resizeTo(main_width, main_height)
+            self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
+        except Exception as e:
+            self.log(f"Error positioning main window: {str(e)}")
+        
+        if secondary_count <= 0:
+            return
+            
+        # Calculate grid for secondary windows
+        # Right side of main window
+        right_width = screen_width - main_width
+        right_height = screen_height
+        
+        # Bottom of main window
+        bottom_width = main_width
+        bottom_height = screen_height - main_height
+        
+        # Determine how to distribute secondary windows
+        if secondary_count <= 3:
+            # Place all secondary windows on the right
+            cell_width = right_width
+            cell_height = right_height // secondary_count
+            
+            for i, window in enumerate(secondary_windows):
+                x = main_width
+                y = i * cell_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(cell_width, cell_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+        else:
+            # Place some windows on right, some on bottom
+            right_count = min(3, secondary_count // 2)
+            bottom_count = secondary_count - right_count
+            
+            # Right side windows
+            cell_width = right_width
+            cell_height = right_height // right_count
+            
+            for i in range(right_count):
+                window = secondary_windows[i]
+                x = main_width
+                y = i * cell_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(cell_width, cell_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+            
+            # Bottom windows
+            cell_width = bottom_width // bottom_count
+            cell_height = bottom_height
+            
+            for i in range(bottom_count):
+                window = secondary_windows[i + right_count]
+                x = i * cell_width
+                y = main_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(cell_width, cell_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+        
+        self.log(f"Arranged {window_count} windows with main window layout")
+
+    def layout_with_main_window_widescreen(self, target_windows, screen_width, screen_height, aspect_ratio):
+        if not target_windows:
+            return
+            
+        window_count = len(target_windows)
+        main_window = target_windows[0]
+        secondary_windows = target_windows[1:]
+        secondary_count = len(secondary_windows)
+        
+        # Main window takes 2/3 of screen width and maintains aspect ratio
+        main_width = int(screen_width * 0.65)
+        main_height = int(main_width / aspect_ratio)
+        
+        # Make sure main window doesn't exceed screen height
+        if main_height > screen_height * 0.7:
+            main_height = int(screen_height * 0.7)
+            main_width = int(main_height * aspect_ratio)
+        
+        # Position main window in upper left
+        try:
+            main_window.moveTo(0, 0)
+            main_window.resizeTo(main_width, main_height)
+            self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
+        except Exception as e:
+            self.log(f"Error positioning main window: {str(e)}")
+        
+        if secondary_count <= 0:
+            return
+        
+        # Arrange secondary windows based on count
+        if secondary_count <= 2:
+            # Stack vertically on right side
+            sec_width = screen_width - main_width
+            sec_height = screen_height // secondary_count
+            
+            for i, window in enumerate(secondary_windows):
+                x = main_width
+                y = i * sec_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(sec_width, sec_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+        else:
+            # Arrange in L shape (right and bottom)
+            right_count = min(2, secondary_count // 2)
+            bottom_count = secondary_count - right_count
+            
+            # Right side windows
+            right_width = screen_width - main_width
+            right_height = screen_height // right_count
+            
+            for i in range(right_count):
+                window = secondary_windows[i]
+                x = main_width
+                y = i * right_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(right_width, right_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+            
+            # Bottom windows
+            bottom_width = main_width // bottom_count
+            bottom_height = screen_height - main_height
+            
+            for i in range(bottom_count):
+                window = secondary_windows[i + right_count]
+                x = i * bottom_width
+                y = main_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(bottom_width, bottom_height)
+                except Exception as e:
+                    self.log(f"Error positioning window: {str(e)}")
+        
+        self.log(f"Arranged {window_count} windows with main window widescreen layout ({aspect_ratio})")
 
     def auto_fill(self):
         target_windows = self.get_target_windows()
         if not target_windows:
             self.log("No windows to layout")
             return
+            
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_count = len(target_windows)
-        cols = int(window_count ** 0.5)
-        if cols * cols < window_count:
-            cols += 1
-        rows = (window_count + cols - 1) // cols
-        cell_width = screen_width // cols
-        cell_height = screen_height // rows
-        for i, window in enumerate(target_windows):
-            row = i // cols
-            col = i % cols
-            x = col * cell_width
-            y = row * cell_height
+        
+        # Handle main window mode
+        use_main_window = self.use_main_window.get()
+        main_window_idx = self.main_window_index.get() - 1  # Convert to 0-based index
+        
+        if use_main_window and 0 <= main_window_idx < window_count:
+            main_window = target_windows.pop(main_window_idx)
+            target_windows.insert(0, main_window)
+            
+            # Main window takes half the screen
+            main_width = int(screen_width * 0.6)
+            main_height = int(screen_height * 0.6)
+            
+            # Position main window in upper left
             try:
-                window.moveTo(x, y)
-                window.resizeTo(cell_width, cell_height)
+                main_window.moveTo(0, 0)
+                main_window.resizeTo(main_width, main_height)
             except Exception as e:
-                self.log(f"Error arranging window: {str(e)}")
+                self.log(f"Error positioning main window: {str(e)}")
+                
+            # Arrange remaining windows
+            remaining_windows = target_windows[1:]
+            if remaining_windows:
+                # Right area
+                right_width = screen_width - main_width
+                right_area = right_width * screen_height
+                
+                # Bottom area
+                bottom_width = main_width
+                bottom_height = screen_height - main_height
+                bottom_area = bottom_width * bottom_height
+                
+                # Total secondary area
+                total_secondary_area = right_area + bottom_area
+                
+                # Windows per area proportional to area size
+                right_windows_count = max(1, int(len(remaining_windows) * (right_area / total_secondary_area)))
+                bottom_windows_count = len(remaining_windows) - right_windows_count
+                
+                # Right windows
+                if right_windows_count > 0:
+                    cols = 1
+                    rows = right_windows_count
+                    cell_width = right_width / cols
+                    cell_height = screen_height / rows
+                    
+                    for i in range(right_windows_count):
+                        window = remaining_windows[i]
+                        row = i // cols
+                        col = i % cols
+                        x = main_width + (col * cell_width)
+                        y = row * cell_height
+                        try:
+                            window.moveTo(int(x), int(y))
+                            window.resizeTo(int(cell_width), int(cell_height))
+                        except Exception as e:
+                            self.log(f"Error arranging window: {str(e)}")
+                
+                # Bottom windows
+                if bottom_windows_count > 0:
+                    cols = bottom_windows_count
+                    rows = 1
+                    cell_width = main_width / cols
+                    cell_height = bottom_height / rows
+                    
+                    for i in range(bottom_windows_count):
+                        window = remaining_windows[i + right_windows_count]
+                        row = i // cols
+                        col = i % cols
+                        x = col * cell_width
+                        y = main_height + (row * cell_height)
+                        try:
+                            window.moveTo(int(x), int(y))
+                            window.resizeTo(int(cell_width), int(cell_height))
+                        except Exception as e:
+                            self.log(f"Error arranging window: {str(e)}")
+        else:
+            # Original auto fill logic
+            cols = int(window_count ** 0.5)
+            if cols * cols < window_count:
+                cols += 1
+            rows = (window_count + cols - 1) // cols
+            cell_width = screen_width // cols
+            cell_height = screen_height // rows
+            for i, window in enumerate(target_windows):
+                row = i // cols
+                col = i % cols
+                x = col * cell_width
+                y = row * cell_height
+                try:
+                    window.moveTo(x, y)
+                    window.resizeTo(cell_width, cell_height)
+                except Exception as e:
+                    self.log(f"Error arranging window: {str(e)}")
+                    
         self.log(f"Arranged {window_count} windows to fill the screen")
         self.update_window_visualization()
-
+    
     def toggle_logging(self):
         if self.logging_enabled.get():
             self.log("Logging enabled")
@@ -1084,7 +1392,10 @@ class AutoKeyBroadcaster:
             target_windows = self.get_target_windows()
             self.log(f"Found {len(target_windows)} matching windows for '{self.target_window_pattern.get()}'")
             self.update_window_visualization()
-
+    def on_monitor_selected(self, event):
+        self.refresh_window_list()
+        self.update_window_visualization()
+        
     def toggle_broadcasting(self):
         if not self.is_broadcasting:
             if not self.target_window_pattern.get():
@@ -1345,7 +1656,41 @@ class AutoKeyBroadcaster:
         if self.focus_thread and self.focus_thread.is_alive():
             self.focus_thread.join(1)
         self.root.destroy()
+        
+class MonitorInfo:
+    def __init__(self):
+        self.monitors = self.get_monitor_info()
 
+    def get_monitor_info(self):
+        monitors = []
+        monitor_enum_proc = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_double)
+
+        def callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
+            monitor_info = {
+                'name': win32api.GetMonitorInfo(hMonitor)['Device'],
+                'width': lprcMonitor.contents.right - lprcMonitor.contents.left,
+                'height': lprcMonitor.contents.bottom - lprcMonitor.contents.top,
+                'x': lprcMonitor.contents.left,
+                'y': lprcMonitor.contents.top
+            }
+            monitors.append(monitor_info)
+            return 1
+
+        ctypes.windll.user32.EnumDisplayMonitors(None, None, monitor_enum_proc(callback), 0)
+        return monitors
+
+    def get_primary_monitor(self):
+        for monitor in self.monitors:
+            if monitor['x'] == 0 and monitor['y'] == 0:
+                return monitor
+        return None
+
+    def get_monitor_by_name(self, name):
+        for monitor in self.monitors:
+            if monitor['name'] == name:
+                return monitor
+        return None
+        
 if __name__ == "__main__":
     root = Tk()
     app = AutoKeyBroadcaster(root)
