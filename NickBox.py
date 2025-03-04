@@ -603,27 +603,20 @@ class AutoKeyBroadcaster:
         selected_monitor = self.get_selected_monitor()
         if not selected_monitor:
             return
-
         screen_width = selected_monitor['width']
         screen_height = selected_monitor['height']
         canvas_width = self.viz_canvas.winfo_width()
         canvas_height = self.viz_canvas.winfo_height()
-
         self.screen_scale = min(canvas_width / screen_width, canvas_height / screen_height)
-
         self.viz_canvas.create_rectangle(
             0, 0,
             screen_width * self.screen_scale,
             screen_height * self.screen_scale,
             outline="white", width=2
         )
-
         target_windows = self.get_target_windows()
         colors = ["red", "green", "blue", "yellow", "cyan", "magenta", "orange", "purple", "brown", "pink"]
-
-        # Sort windows by their top-left corner position (upper left to clockwise)
         target_windows.sort(key=lambda w: (w.top, w.left))
-
         for i, window in enumerate(target_windows):
             if self.is_window_on_monitor(window, selected_monitor):
                 color = colors[i % len(colors)]
@@ -636,8 +629,6 @@ class AutoKeyBroadcaster:
                     fill=color, outline="white", width=1,
                     tags=f"window_{i}"
                 )
-
-                # Add window number in top-left corner
                 self.viz_canvas.create_text(
                     x1 + 10, y1 + 10,
                     text=f"#{i+1}",
@@ -645,28 +636,23 @@ class AutoKeyBroadcaster:
                     font=("Arial", 10, "bold"),
                     tags=f"window_{i}"
                 )
-
-                # Add window title in center
                 title = window.title if len(window.title) < 20 else window.title[:17] + "..."
                 self.viz_canvas.create_text(
                     (x1 + x2) / 2, (y1 + y2) / 2,
                     text=title, fill="white", font=("Arial", 8),
                     tags=f"window_{i}"
                 )
-
                 resize_handle = self.viz_canvas.create_polygon(
                     x2, y2 - 10, x2 - 10, y2, x2, y2,
                     fill="white", outline="black", width=1,
                     tags=f"resize_{i}"
                 )
-
                 self.window_rects[rect_id] = {
                     "window": window,
                     "index": i,
                     "original_geometry": (window.left, window.top, window.right, window.bottom),
                     "resize_handle": resize_handle
                 }
-
         if not target_windows:
             self.viz_canvas.create_text(
                 canvas_width / 2, canvas_height / 2,
@@ -685,14 +671,10 @@ class AutoKeyBroadcaster:
                 "canvas_height": self.viz_canvas.winfo_height()
             }
             self.viz_canvas.itemconfig(closest[0], width=2)
-
-            # Hide the name, number, and resize handle
             window_info = self.window_rects[closest[0]]
             for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
                 if "text" in self.viz_canvas.type(item):
                     self.viz_canvas.itemconfig(item, state="hidden")
-
-            # Hide the resize handle
             resize_handle = window_info.get("resize_handle")
             if resize_handle:
                 self.viz_canvas.itemconfig(resize_handle, state="hidden")
@@ -700,101 +682,69 @@ class AutoKeyBroadcaster:
     def drag_window(self, event):
         if not self.dragging_window:
             return
-
         dx = event.x - self.dragging_window["start_x"]
         dy = event.y - self.dragging_window["start_y"]
         orig = self.dragging_window["original_coords"]
-
-        # Calculate new coordinates
         new_x1 = orig[0] + dx
         new_y1 = orig[1] + dy
         new_x2 = orig[2] + dx
         new_y2 = orig[3] + dy
-
-        # Apply snapping if enabled
         if self.grid_snap_enabled.get():
             snap_size = self.grid_snap_size.get() * self.screen_scale
-            # Snap to grid
             new_x1 = round(new_x1 / snap_size) * snap_size
             new_y1 = round(new_y1 / snap_size) * snap_size
             new_x2 = new_x1 + (orig[2] - orig[0])
             new_y2 = new_y1 + (orig[3] - orig[1])
-
-        # Snap to corners if enabled
         if self.corner_snap_enabled.get():
             canvas_width = self.dragging_window["canvas_width"]
             canvas_height = self.dragging_window["canvas_height"]
             corner_snap_distance = 20 * self.screen_scale
-
-            # Top-left corner
             if abs(new_x1) < corner_snap_distance and abs(new_y1) < corner_snap_distance:
                 new_x1 = 0
                 new_y1 = 0
                 new_x2 = orig[2] - orig[0]
                 new_y2 = orig[3] - orig[1]
-
-            # Top-right corner
             if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y1) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y1 = 0
                 new_x1 = new_x2 - (orig[2] - orig[0])
                 new_y2 = orig[3] - orig[1]
-
-            # Bottom-left corner
             if abs(new_x1) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x1 = 0
                 new_y2 = canvas_height
                 new_x2 = orig[2] - orig[0]
                 new_y1 = new_y2 - (orig[3] - orig[1])
-
-            # Bottom-right corner
             if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y2 = canvas_height
                 new_x1 = new_x2 - (orig[2] - orig[0])
                 new_y1 = new_y2 - (orig[3] - orig[1])
-
-        # Snap to other windows if enabled
         if self.window_snap_enabled.get():
             snap_distance = 10 * self.screen_scale
             current_id = self.dragging_window["id"]
-
             for rect_id, info in self.window_rects.items():
                 if rect_id == current_id:
                     continue
-
                 rect_coords = self.viz_canvas.coords(rect_id)
                 rx1, ry1, rx2, ry2 = rect_coords
-
-                # Snap left edge to other window's right edge
                 if abs(new_x1 - rx2) < snap_distance:
                     new_x1 = rx2
                     new_x2 = new_x1 + (orig[2] - orig[0])
-
-                # Snap right edge to other window's left edge
                 if abs(new_x2 - rx1) < snap_distance:
                     new_x2 = rx1
                     new_x1 = new_x2 - (orig[2] - orig[0])
-
-                # Snap top edge to other window's bottom edge
                 if abs(new_y1 - ry2) < snap_distance:
                     new_y1 = ry2
                     new_y2 = new_y1 + (orig[3] - orig[1])
-
-                # Snap bottom edge to other window's top edge
                 if abs(new_y2 - ry1) < snap_distance:
                     new_y2 = ry1
                     new_y1 = new_y2 - (orig[3] - orig[1])
-
-        # Update the window position
         self.viz_canvas.coords(self.dragging_window["id"], new_x1, new_y1, new_x2, new_y2)
-
-        # Update any child elements
         window_info = self.window_rects[self.dragging_window["id"]]
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
             if item != self.dragging_window["id"]:
                 self.viz_canvas.move(item, new_x1 - orig[0], new_y1 - orig[1])
-            
+
     def end_window_drag(self, event):
         if not self.dragging_window:
             return
@@ -815,31 +765,23 @@ class AutoKeyBroadcaster:
         except Exception as e:
             self.log(f"Error moving window: {str(e)}")
         self.viz_canvas.itemconfig(rect_id, width=1)
-
-        # Show the name, number, and resize handle
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
             if "text" in self.viz_canvas.type(item):
                 self.viz_canvas.itemconfig(item, state="normal")
-
-        # Show the resize handle
         resize_handle = window_info.get("resize_handle")
         if resize_handle:
             self.viz_canvas.itemconfig(resize_handle, state="normal")
-
         self.dragging_window = None
         self.update_window_visualization()
 
     def start_window_resize(self, event):
         closest = self.viz_canvas.find_closest(event.x, event.y)
-        if not closest:  # Check if closest is empty
-            return  # No item found, so do nothing
-
-        item_id = closest[0]  # Get the item ID
+        if not closest:
+            return
+        item_id = closest[0]
         tags = self.viz_canvas.gettags(item_id)
-
-        if not tags:  # Check if tags is empty
-            return  # No tags, so do nothing
-
+        if not tags:
+            return
         if "resize" in tags[0]:
             try:
                 index = int(tags[0].split("_")[1])
@@ -848,7 +790,6 @@ class AutoKeyBroadcaster:
                     if info["index"] == index:
                         rect_id = rid
                         break
-
                 if rect_id:
                     self.resizing_window = {
                         "id": rect_id,
@@ -857,81 +798,57 @@ class AutoKeyBroadcaster:
                         "original_coords": self.viz_canvas.coords(rect_id)
                     }
                     self.viz_canvas.itemconfig(rect_id, width=2)
+                    window_info = self.window_rects[rect_id]
+                    for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
+                        if "text" in self.viz_canvas.type(item):
+                            self.viz_canvas.itemconfig(item, state="hidden")
             except (ValueError, IndexError) as e:
                 print(f"Error processing resize tag: {e}")
-        pass
-        
+
     def resize_window(self, event):
         if not self.resizing_window:
             return
-            
         dx = event.x - self.resizing_window["start_x"]
         dy = event.y - self.resizing_window["start_y"]
         orig = self.resizing_window["original_coords"]
-        
-        # Calculate new coordinates
         new_x1 = orig[0]
         new_y1 = orig[1]
         new_x2 = orig[2] + dx
         new_y2 = orig[3] + dy
-        
-        # Apply snapping if enabled
         if self.grid_snap_enabled.get():
             snap_size = self.grid_snap_size.get() * self.screen_scale
-            # Snap to grid
             new_x2 = round(new_x2 / snap_size) * snap_size
             new_y2 = round(new_y2 / snap_size) * snap_size
-        
-        # Snap to corners if enabled
         if self.corner_snap_enabled.get():
             canvas_width = self.viz_canvas.winfo_width()
             canvas_height = self.viz_canvas.winfo_height()
             corner_snap_distance = 20 * self.screen_scale
-            
-            # Bottom-right corner
             if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y2 = canvas_height
-        
-        # Snap to other windows if enabled
         if self.window_snap_enabled.get():
             snap_distance = 10 * self.screen_scale
             current_id = self.resizing_window["id"]
-            
             for rect_id, info in self.window_rects.items():
                 if rect_id == current_id:
                     continue
-                    
                 rect_coords = self.viz_canvas.coords(rect_id)
                 rx1, ry1, rx2, ry2 = rect_coords
-                
-                # Snap right edge to other window's left edge
                 if abs(new_x2 - rx1) < snap_distance:
                     new_x2 = rx1
-                
-                # Snap bottom edge to other window's top edge
                 if abs(new_y2 - ry1) < snap_distance:
                     new_y2 = ry1
-        
-        # Update the window size
         self.viz_canvas.coords(self.resizing_window["id"], new_x1, new_y1, new_x2, new_y2)
-        
-        # Update any child elements
         window_info = self.window_rects[self.resizing_window["id"]]
-        
-        # Update resize handle position
         resize_handle = None
         for item in self.viz_canvas.find_withtag(f"resize_{window_info['index']}"):
             resize_handle = item
             break
-            
         if resize_handle:
-            self.viz_canvas.coords(resize_handle, 
-                new_x2, new_y2 - 10, 
-                new_x2 - 10, new_y2, 
+            self.viz_canvas.coords(resize_handle,
+                new_x2, new_y2 - 10,
+                new_x2 - 10, new_y2,
                 new_x2, new_y2)
-                
-        # Update window text position
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
             if item != self.resizing_window["id"] and "text" in self.viz_canvas.type(item):
                 self.viz_canvas.coords(item, (new_x1 + new_x2) / 2, (new_y1 + new_y2) / 2)
@@ -953,11 +870,13 @@ class AutoKeyBroadcaster:
             window.moveTo(new_left, new_top)
             window.resizeTo(width, height)
         except Exception as e:
-            print(f"Error resizing window: {str(e)}")  # Debug print
+            print(f"Error resizing window: {str(e)}")
         self.viz_canvas.itemconfig(rect_id, width=1)
+        for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
+            if "text" in self.viz_canvas.type(item):
+                self.viz_canvas.itemconfig(item, state="normal")
         self.resizing_window = None
         self.update_window_visualization()
-
 
     def toggle_borderless(self):
         target_windows = self.get_target_windows()
