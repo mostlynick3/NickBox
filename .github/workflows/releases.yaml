@@ -1,51 +1,28 @@
-name: Generate Release HTML
+name: Generate Releases HTML
 
 on:
+  push:
+    branches: [ web ]
   release:
-    types: [published]  # Trigger the workflow when a new release is published
+    types: [ published ]
 
 jobs:
-  generate-html:
+  build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write  # Required to push changes back to the repository
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get release assets
-        id: get-release-assets
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: process.env.GITHUB_REF.split('/').pop()
-            });
-            const assets = release.assets.map(asset => asset.name);
-            core.setOutput('assets', assets.join(' '));  # Set output for use in the next step
-
-      - name: Generate HTML file
+      - uses: actions/checkout@v3
+      
+      - name: Get releases and generate HTML
         run: |
-          echo "<!DOCTYPE html>" > release_files.html
-          echo "<html lang='en'>" >> release_files.html
-          echo "<head><title>Release Files</title></head>" >> release_files.html
-          echo "<body>" >> release_files.html
-          echo "<h1>Files in Release</h1>" >> release_files.html
-          echo "<ul>" >> release_files.html
-          for file in ${{ steps.get-release-assets.outputs.assets }}; do
-            echo "<li><a href='$file'>$file</a></li>" >> release_files.html
-          done
-          echo "</ul>" >> release_files.html
-          echo "</body></html>" >> release_files.html
-
-      - name: Commit and push changes
+          echo "<!DOCTYPE html><html><head><title>Releases</title></head><body><h1>Releases</h1><ul>" > releases.html
+          curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | 
+          jq -r '.[] | "<li><a href=\"\(.html_url)\">\(.tag_name): \(.name)</a> (\(.published_at | fromjson | strftime("%Y-%m-%d"))) - Assets: " + (.assets | map("<a href=\"\(.browser_download_url)\">\(.name)</a>") | join(", ")) + "</li>"' >> releases.html
+          echo "</ul></body></html>" >> releases.html
+      
+      - name: Commit and push
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add release_files.html
-          git commit -m "Automatically generated release files HTML"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add releases.html
+          git commit -m "Update releases.html" || exit 0
           git push
