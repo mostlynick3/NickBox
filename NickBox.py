@@ -35,6 +35,7 @@ class AutoKeyBroadcaster:
         self.is_broadcasting = False
         self.is_auto_focusing = False
         self.is_auto_focusing_paused = False
+        #self.only_on_key_up_var = BooleanVar(value=False)
         self.broadcast_thread = None
         self.hide_taskbar_var = BooleanVar(value=False)
         self.taskbar_hidden = False
@@ -211,6 +212,7 @@ class AutoKeyBroadcaster:
             "logging_enabled": self.logging_enabled.get(),
             "hide_taskbar": self.hide_taskbar_var.get(),
             "grid_snap_enabled": self.grid_snap_enabled.get(),
+            #"only_on_key_up": self.only_on_key_up_var.get(),
             "grid_snap_size": self.grid_snap_size.get(),
             "window_snap_enabled": self.window_snap_enabled.get(),
             "corner_snap_enabled": self.corner_snap_enabled.get()
@@ -233,6 +235,7 @@ class AutoKeyBroadcaster:
                     self.hide_taskbar_var.set(settings.get("hide_taskbar", False))
                     self.grid_snap_enabled.set(settings.get("grid_snap_enabled", True))
                     self.grid_snap_size.set(settings.get("grid_snap_size", 20))
+                    #self.only_on_key_up_var.set(settings.get("only_on_key_up", False))
                     self.window_snap_enabled.set(settings.get("window_snap_enabled", True))
                     self.corner_snap_enabled.set(settings.get("corner_snap_enabled", True))
 
@@ -424,13 +427,19 @@ class AutoKeyBroadcaster:
         broadcast_mode_frame.pack(fill="x", padx=5, pady=5)
 
         self.broadcast_all = Checkbutton(broadcast_mode_frame, text="Broadcast all keyboard input",
-                                             variable=self.broadcast_all_keys, command=self.toggle_broadcast_mode)
+                                         variable=self.broadcast_all_keys, command=self.toggle_broadcast_mode)
         self.broadcast_all.pack(side=LEFT, padx=5)
 
         self.broadcast_select_keys = BooleanVar(value=True)
         self.broadcast_select = Checkbutton(broadcast_mode_frame, text="Broadcast select keys",
                                                 variable=self.broadcast_select_keys, command=self.toggle_broadcast_mode)
         self.broadcast_select.pack(side=RIGHT, padx=5)
+
+        # Add the new checkbox
+        self.only_on_key_up_var = BooleanVar(value=False)
+        #self.only_on_key_up_check = Checkbutton(broadcast_mode_frame, text="Only on key up", # Not sure if this is useful?
+        #                                        variable=self.only_on_key_up_var)
+        #self.only_on_key_up_check.pack(side=RIGHT, padx=5)
 
         self.keys_section_frame = Frame(broadcast_frame)
         self.keys_section_frame.pack(fill="x", padx=5, pady=5)
@@ -1387,44 +1396,54 @@ class AutoKeyBroadcaster:
         key_hold_times = {}
         key_repeat_delay = 0.5  # Initial delay before repeating in seconds
         key_repeat_rate = 0.03  # Repeat rate in seconds
-        
+
         while self.is_broadcasting and self.running:
             keys = [k.strip() for k in self.sanitize_keys(self.keys_entry.get()).split(',')]
             current_time = time.time()
-            
+
             # Initialize tracking for new keys
             for key in keys:
                 if key not in prev_key_states:
                     prev_key_states[key] = False
                     key_hold_times[key] = 0
-            
+
             try:
                 target_windows = self.get_target_windows()
                 active_window = gw.getActiveWindow()
-                
+
                 if target_windows and any(window == active_window for window in target_windows):
                     for key in keys:
                         current_state = keyboard.is_pressed(key)
-                        
+
                         if current_state:  # Key is pressed
                             if not prev_key_states[key]:  # First press
-                                for window in target_windows:
-                                    if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, 
-                                                           ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
+                                if not self.only_on_key_up_var.get():  # Only send if not in "only on key up" mode
+                                    for window in target_windows:
+                                        if window != active_window:
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN,
+                                                                 ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
                                 key_hold_times[key] = current_time
                             elif current_time - key_hold_times[key] > key_repeat_delay:
-                                # After delay, send key repeatedly
+                                # After delay, send key repeatedly (only if not in "only on key up" mode)
+                                if not self.only_on_key_up_var.get():
+                                    for window in target_windows:
+                                        if window != active_window:
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN,
+                                                                 ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
+                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
+                        else:  # Key is released
+                            if prev_key_states[key]:  # Previously pressed
+                                # Always send key up events
                                 for window in target_windows:
                                     if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, 
-                                                           ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
-                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
-                        
+                                        win32api.PostMessage(window._hWnd, self.WM_KEYUP,
+                                                             ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
+
                         prev_key_states[key] = current_state
             except Exception as e:
                 self.log(f"Error: {str(e)}")
             time.sleep(0.01)
+            
     def broadcast_all_keyboard(self):
         all_keys = [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -1437,36 +1456,44 @@ class AutoKeyBroadcaster:
         key_hold_times = {key: 0 for key in all_keys}
         key_repeat_delay = 0.5  # Initial delay before repeating in seconds
         key_repeat_rate = 0.03  # Repeat rate in seconds
-        
+
         while self.is_broadcasting and self.running:
             try:
                 target_windows = self.get_target_windows()
                 active_window = gw.getActiveWindow()
                 current_time = time.time()
-                
+
                 if target_windows and any(window == active_window for window in target_windows):
                     for key in all_keys:
                         current_state = keyboard.is_pressed(key)
                         vk_code = self.get_vk_code(key)
-                        
+
                         if current_state and vk_code:  # Key is pressed
                             if not prev_key_states[key]:  # First press
-                                for window in target_windows:
-                                    if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
+                                if not self.only_on_key_up_var.get():  # Only send if not in "only on key up" mode
+                                    for window in target_windows:
+                                        if window != active_window:
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
                                 key_hold_times[key] = current_time
                             elif current_time - key_hold_times[key] > key_repeat_delay:
-                                # After delay, send key repeatedly
+                                # After delay, send key repeatedly (only if not in "only on key up" mode)
+                                if not self.only_on_key_up_var.get():
+                                    for window in target_windows:
+                                        if window != active_window:
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
+                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
+                        else:  # Key is released
+                            if prev_key_states[key]:  # Previously pressed
+                                # Always send key up events
                                 for window in target_windows:
                                     if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
-                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
-                        
+                                        win32api.PostMessage(window._hWnd, self.WM_KEYUP, vk_code, 0)
+
                         prev_key_states[key] = current_state
             except Exception as e:
                 self.log(f"Error: {str(e)}")
             time.sleep(0.01)
-        
+     
     def get_vk_code(self, key):
         special_keys = {
             'space': win32con.VK_SPACE,
