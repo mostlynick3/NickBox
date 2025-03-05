@@ -2,35 +2,50 @@ name: Generate Release HTML
 
 on:
   release:
-    types: [published]  # Trigger the action when a new release is published
+    types: [published]  # Trigger the workflow when a new release is published
 
 jobs:
   generate-html:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # Required to push changes back to the repository
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Fetch Releases
-      run: |
-        # Get all releases using GitHub API
-        curl -s https://api.github.com/repos/${{ github.repository }}/releases > releases.json
+      - name: Get release assets
+        id: get-release-assets
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: process.env.GITHUB_REF.split('/').pop()
+            });
+            const assets = release.assets.map(asset => asset.name);
+            core.setOutput('assets', assets.join(' '));  # Set output for use in the next step
 
-    - name: Generate HTML file from releases
-      run: |
-        # Create a basic HTML structure
-        echo "<html><head><title>Releases</title></head><body>" > releases.html
-        echo "<h1>Release List</h1>" >> releases.html
-        # Loop through releases and append them to the HTML
-        jq -r '.[] | "<p><strong>\(.name)</strong> - \(.tag_name)</p><p>\(.body)</p><hr>"' releases.json >> releases.html
-        echo "</body></html>" >> releases.html
+      - name: Generate HTML file
+        run: |
+          echo "<!DOCTYPE html>" > release_files.html
+          echo "<html lang='en'>" >> release_files.html
+          echo "<head><title>Release Files</title></head>" >> release_files.html
+          echo "<body>" >> release_files.html
+          echo "<h1>Files in Release</h1>" >> release_files.html
+          echo "<ul>" >> release_files.html
+          for file in ${{ steps.get-release-assets.outputs.assets }}; do
+            echo "<li><a href='$file'>$file</a></li>" >> release_files.html
+          done
+          echo "</ul>" >> release_files.html
+          echo "</body></html>" >> release_files.html
 
-    - name: Commit generated HTML
-      uses: EndBug/add-and-commit@v7
-      with:
-        author_name: 'GitHub Actions'
-        author_email: 'actions@github.com'
-        message: 'Update releases.html with new release'
-        add: 'releases.html'
-i ask
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add release_files.html
+          git commit -m "Automatically generated release files HTML"
+          git push
