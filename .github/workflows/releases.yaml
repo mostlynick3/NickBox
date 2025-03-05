@@ -17,10 +17,12 @@ jobs:
       
       - name: Get releases and generate HTML
         run: |
-          echo "<!DOCTYPE html><html><head><title>Releases</title></head><body><h1>Releases</h1><ul>" > releases.html
+          echo "<!DOCTYPE html><html><head><title>Releases</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:20px;} .release{margin-bottom:30px;border-bottom:1px solid #eee;padding-bottom:20px;} .assets{margin-top:10px;}</style></head><body><h1>Releases</h1>" > releases.html
+          
           curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | 
-          jq -r '.[] | "<li><a href=\"\(.html_url)\">\(.tag_name): \(.name)</a> (\(.published_at | sub("T.*Z"; ""))) - Assets: " + (.assets | map("<a href=\"\(.browser_download_url)\">\(.name)</a>") | join(", ")) + "</li>"' >> releases.html
-          echo "</ul></body></html>" >> releases.html
+          jq -r '.[] | "<div class=\"release\"><h2><a href=\"\(.html_url)\">\(.name)</a></h2><p>Tag: \(.tag_name) | Published: \(.published_at | sub("T.*Z"; "")) | Author: \(.author.login)</p><p>\(.body | gsub("<";"&lt;") | gsub(">";"&gt;") | gsub("\n";"<br>"))</p><div class=\"assets\"><h3>Assets:</h3><ul>" + (.assets | map("<li><a href=\"\(.browser_download_url)\">\(.name)</a> (\(.size/1024/1024 | floor * 100 / 100) MB)</li>") | join("")) + "</ul></div></div>"' >> releases.html
+          
+          echo "</body></html>" >> releases.html
       
       - name: Commit and push
         run: |
