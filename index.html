@@ -263,14 +263,34 @@
     }
     
 	function loadDownloads() {
-	  const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases`;
-	
-	  document.getElementById('mainContent').innerHTML = `
-	    <p>You can find the latest releases on the GitHub releases page:</p>
-	    <a href="${releasesUrl}" target="_blank">GitHub Releases</a>
-	  `;
-	
+	  document.getElementById('mainContent').innerHTML = '<div id="loadingIndicator">Loading releases...</div>';
 	  document.getElementById('sidebar').innerHTML = '<h2>Downloads</h2>';
+	  
+	  // Fetch the releases.html content
+	  fetchContent('releases.html')
+	    .then(content => {
+	      // Extract the body content from the releases.html
+	      const bodyContent = content.match(/<body>([\s\S]*?)<\/body>/i);
+	      
+	      if (bodyContent && bodyContent[1]) {
+	        // Only use the content inside the body tags, not the full HTML
+	        document.getElementById('mainContent').innerHTML = bodyContent[1];
+	      } else {
+	        document.getElementById('mainContent').innerHTML = `
+	          <h2>Releases</h2>
+	          <p>Could not parse releases content. You can view all releases on the GitHub releases page:</p>
+	          <a href="https://github.com/${repoOwner}/${repoName}/releases" target="_blank">GitHub Releases</a>
+	        `;
+	      }
+	    })
+	    .catch(error => {
+	      document.getElementById('mainContent').innerHTML = `
+	        <h2>Releases</h2>
+	        <p>Failed to load releases. Error: ${error.message}</p>
+	        <p>You can view all releases on the GitHub releases page:</p>
+	        <a href="https://github.com/${repoOwner}/${repoName}/releases" target="_blank">GitHub Releases</a>
+	      `;
+	    });
 	}
     
     // Load license content directly in the main content area
