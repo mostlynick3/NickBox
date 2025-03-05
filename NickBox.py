@@ -7,7 +7,6 @@ import csv
 import ctypes
 import json
 from datetime import datetime
-
 from tkinter import Tk, Canvas, StringVar, BooleanVar, IntVar, filedialog, LEFT, RIGHT, Text, X, Y, Spinbox, END
 from tkinter.ttk import Frame, LabelFrame, Label, Combobox, Checkbutton, Button, Scrollbar, Style, Entry
 from pynput.mouse import Listener as MouseListener
@@ -35,7 +34,6 @@ class AutoKeyBroadcaster:
         self.is_broadcasting = False
         self.is_auto_focusing = False
         self.is_auto_focusing_paused = False
-        #self.only_on_key_up_var = BooleanVar(value=False)
         self.broadcast_thread = None
         self.hide_taskbar_var = BooleanVar(value=False)
         self.taskbar_hidden = False
@@ -68,72 +66,56 @@ class AutoKeyBroadcaster:
         self.create_widgets()
         self.window_list = self.get_all_windows()
         self.apply_profile_settings()
-        self.root.update_idletasks()    
+        self.root.update_idletasks()
         self.root.after(500, self.update_window_visualization)
         self.alt_tab_pressed = False
         self.alt_tab_pause_time = 1
         self.last_alt_tab_release_time = 0
-        self.alt_tab_pressed = False
         self.keyboard_listener()
         self.mouse_listener = MouseListener(on_click=self.on_mouse_click)
         self.mouse_listener.start()
 
     def create_icon_in_background(self):
-        # Start a background thread to handle icon creation
         def _create_icon():
             try:
                 icon_data = base64.b64decode(self.icon_base64)
                 temp_dir = tempfile.gettempdir()
                 self.icon_path = os.path.join(temp_dir, "nickbox_temp.ico")
-                
-                # Write the icon data to a temporary file without showing the process to the user
                 with open(self.icon_path, "wb") as icon_file:
                     icon_file.write(icon_data)
-
-                # Set the icon after it's been created
                 self.root.after(0, self.set_window_icon)
             except Exception as e:
                 print(f"Could not set the app icon: {e}")
-        
-        # Run the icon creation process in a separate thread
         icon_thread = threading.Thread(target=_create_icon)
-        icon_thread.daemon = True  # Allow the thread to exit when the main program exits
+        icon_thread.daemon = True
         icon_thread.start()
 
     def set_window_icon(self):
         if self.icon_path and os.path.exists(self.icon_path):
             self.root.iconbitmap(self.icon_path)
             self.root.deiconify()
-        
+
     def toggle_taskbar(self, hide=True):
         try:
-            # Get the taskbar window handle
             taskbar_hwnd = win32gui.FindWindow("Shell_TrayWnd", None)
             if not taskbar_hwnd:
                 self.log("Couldn't find taskbar window")
                 return
-                
             if hide and not self.taskbar_hidden:
                 self.log("Hiding taskbar")
-                # Hide the taskbar using ShowWindow API
                 win32gui.ShowWindow(taskbar_hwnd, win32con.SW_HIDE)
                 self.taskbar_hidden = True
             elif not hide and self.taskbar_hidden:
                 self.log("Showing taskbar")
-                # Show the taskbar
                 win32gui.ShowWindow(taskbar_hwnd, win32con.SW_SHOW)
                 self.taskbar_hidden = False
-                
-            # Also handle the secondary taskbar that may appear on other monitors
             secondary_taskbar = win32gui.FindWindow("Shell_SecondaryTrayWnd", None)
             if secondary_taskbar:
                 win32gui.ShowWindow(secondary_taskbar, win32con.SW_HIDE if hide else win32con.SW_SHOW)
-                
         except Exception as e:
             self.log(f"Error toggling taskbar: {str(e)}")
-        
+
     def keyboard_listener(self):
-        # Bind the Alt key press and release events
         keyboard.on_press_key('alt', self.on_alt_press)
         keyboard.on_release_key('alt', self.on_alt_release)
         keyboard.on_press_key('tab', self.on_tab_press)
@@ -212,7 +194,6 @@ class AutoKeyBroadcaster:
             "logging_enabled": self.logging_enabled.get(),
             "hide_taskbar": self.hide_taskbar_var.get(),
             "grid_snap_enabled": self.grid_snap_enabled.get(),
-            #"only_on_key_up": self.only_on_key_up_var.get(),
             "grid_snap_size": self.grid_snap_size.get(),
             "window_snap_enabled": self.window_snap_enabled.get(),
             "corner_snap_enabled": self.corner_snap_enabled.get()
@@ -235,10 +216,8 @@ class AutoKeyBroadcaster:
                     self.hide_taskbar_var.set(settings.get("hide_taskbar", False))
                     self.grid_snap_enabled.set(settings.get("grid_snap_enabled", True))
                     self.grid_snap_size.set(settings.get("grid_snap_size", 20))
-                    #self.only_on_key_up_var.set(settings.get("only_on_key_up", False))
                     self.window_snap_enabled.set(settings.get("window_snap_enabled", True))
                     self.corner_snap_enabled.set(settings.get("corner_snap_enabled", True))
-
                     return True
             except:
                 return False
@@ -283,7 +262,6 @@ class AutoKeyBroadcaster:
         sanitized_keys = self.sanitize_keys(self.keys_entry.get())
         self.keys_entry.delete(0, END)
         self.keys_entry.insert(0, sanitized_keys)
-        
         keys_list = sanitized_keys.split(',')
         keys_file = self.get_profile_keys_file(self.current_profile)
         with open(keys_file, 'w', newline='') as file:
@@ -325,73 +303,46 @@ class AutoKeyBroadcaster:
             self.log(f"Set profile {profile_name} as default")
         else:
             self.log(f"Profile {profile_name} does not exist")
-                
+
     def create_widgets(self):
-        # Profile Frame
         profile_frame = Frame(self.root)
         profile_frame.pack(fill="x", padx=10, pady=2)
-
         self.profile_label = Label(profile_frame, text=f"Profile: {self.current_profile}")
         self.profile_label.pack(side=LEFT, padx=5)
-
         profile_buttons_frame = Frame(profile_frame)
         profile_buttons_frame.pack(side=RIGHT)
-
         self.profile_num = StringVar()
         profile_combo = Combobox(profile_buttons_frame, textvariable=self.profile_num, values=list(range(1, 11)), width=2)
         profile_combo.pack(side=LEFT, padx=2)
-
-        load_profile_btn = Button(profile_buttons_frame, text="Load", width=5,
-                                      command=lambda: self.load_profile(self.profile_num.get()))
+        load_profile_btn = Button(profile_buttons_frame, text="Load", width=5, command=lambda: self.load_profile(self.profile_num.get()))
         load_profile_btn.pack(side=LEFT, padx=2)
-
-        save_profile_btn = Button(profile_buttons_frame, text="Save", width=5,
-                                      command=lambda: self.save_profile(self.profile_num.get()))
+        save_profile_btn = Button(profile_buttons_frame, text="Save", width=5, command=lambda: self.save_profile(self.profile_num.get()))
         save_profile_btn.pack(side=LEFT, padx=2)
-
-        default_profile_btn = Button(profile_buttons_frame, text="Set Default", width=10,
-                                         command=lambda: self.set_default_profile(self.profile_num.get()))
+        default_profile_btn = Button(profile_buttons_frame, text="Set Default", width=10, command=lambda: self.set_default_profile(self.profile_num.get()))
         default_profile_btn.pack(side=LEFT, padx=2)
-
-        # Select Frame
         select_frame = LabelFrame(self.root, text="Target Window")
         select_frame.pack(fill="x", expand=True, padx=10, pady=5)
-        # Inside the create_widgets method
         self.monitor_names = [monitor['name'] for monitor in self.monitor_info.monitors]
         self.selected_monitor = StringVar()
-
-        # Add a dropdown for monitor selection
         line_frame_monitor = Frame(select_frame)
         line_frame_monitor.pack(fill="x", padx=5, pady=5)
-        # Add the monitor label to the left
         monitor_label = Label(line_frame_monitor, text="Select monitor:")
         monitor_label.pack(side="left", padx=5)
-        # Add the monitor combobox to the right
         monitor_combo = Combobox(line_frame_monitor, textvariable=self.selected_monitor, values=self.monitor_names)
         monitor_combo.pack(side="right", fill="x", expand=True, padx=5)
         monitor_combo.bind("<<ComboboxSelected>>", self.on_monitor_selected)
-        monitor_combo.current(0)  # Auto-select first monitor in list
-
+        monitor_combo.current(0)
         line_frame = Frame(select_frame)
         line_frame.pack(fill="x", padx=5, pady=5)
-        # Add the label to the left
         label = Label(line_frame, text="Select window:")
         label.pack(side="left", padx=5)
-        # Add the combobox to the right
         self.window_combo = Combobox(line_frame, textvariable=self.target_window_pattern, values=self.window_list)
         self.window_combo.pack(side="right", fill="x", expand=True, padx=5)
-
-        # Bind events
         self.window_combo.bind("<<ComboboxSelected>>", self.on_window_selected)
         self.window_combo.bind("<Button-1>", self.refresh_window_list)
-
-        # Placeholder for Window Management Frame
         self.window_mgmt_frame = LabelFrame(self.root, text="Window Management")
         self.window_mgmt_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Schedule the dimension calculation
         self.root.after(100, self.setup_window_management_frame)
-
         self.viz_canvas = Canvas(self.window_mgmt_frame, bg="black")
         self.viz_canvas.pack(fill="both", expand=True, padx=5, pady=5)
         self.viz_canvas.bind("<Button-1>", self.start_window_drag)
@@ -400,147 +351,105 @@ class AutoKeyBroadcaster:
         self.viz_canvas.bind("<Button-3>", self.start_window_resize)
         self.viz_canvas.bind("<B3-Motion>", self.resize_window)
         self.viz_canvas.bind("<ButtonRelease-3>", self.end_window_resize)
-
         controls_frame = Frame(self.window_mgmt_frame)
         controls_frame.pack(fill="x", padx=5, pady=5)
-
         auto_layout_frame = Frame(controls_frame)
         auto_layout_frame.pack(side=LEFT, padx=5)
-
         Button(auto_layout_frame, text="Auto 1:1", command=lambda: self.auto_layout("1:1")).pack(side=LEFT)
         Button(auto_layout_frame, text="Auto 16:9", command=lambda: self.auto_layout("16:9")).pack(side=LEFT)
         Button(auto_layout_frame, text="Auto 21:9", command=lambda: self.auto_layout("21:9")).pack(side=LEFT)
         Button(auto_layout_frame, text="Auto Fill", command=self.auto_fill).pack(side=LEFT, padx=2)
-
         borderless_frame = Frame(controls_frame)
         borderless_frame.pack(side=RIGHT, padx=5)
-
         self.borderless_var = BooleanVar(value=False)
-        Checkbutton(borderless_frame, text="Borderless",
-                        variable=self.borderless_var, command=self.toggle_borderless).pack(side=RIGHT)
-
-        # Broadcast Frame
+        Checkbutton(borderless_frame, text="Borderless", variable=self.borderless_var, command=self.toggle_borderless).pack(side=RIGHT)
         broadcast_frame = LabelFrame(self.root, text="Key Broadcasting")
         broadcast_frame.pack(fill="x", expand=True, padx=10, pady=5)
-
         broadcast_mode_frame = Frame(broadcast_frame)
         broadcast_mode_frame.pack(fill="x", padx=5, pady=5)
-
-        self.broadcast_all = Checkbutton(broadcast_mode_frame, text="Broadcast all keyboard input",
-                                         variable=self.broadcast_all_keys, command=self.toggle_broadcast_mode)
+        self.broadcast_all = Checkbutton(broadcast_mode_frame, text="Broadcast all keyboard input", variable=self.broadcast_all_keys, command=self.toggle_broadcast_mode)
         self.broadcast_all.pack(side=LEFT, padx=5)
-
         self.broadcast_select_keys = BooleanVar(value=True)
-        self.broadcast_select = Checkbutton(broadcast_mode_frame, text="Broadcast select keys",
-                                                variable=self.broadcast_select_keys, command=self.toggle_broadcast_mode)
+        self.broadcast_select = Checkbutton(broadcast_mode_frame, text="Broadcast select keys", variable=self.broadcast_select_keys, command=self.toggle_broadcast_mode)
         self.broadcast_select.pack(side=RIGHT, padx=5)
-
-        # Add the new checkbox
         self.only_on_key_up_var = BooleanVar(value=False)
-        #self.only_on_key_up_check = Checkbutton(broadcast_mode_frame, text="Only on key up", # Not sure if this is useful?
-        #                                        variable=self.only_on_key_up_var)
-        #self.only_on_key_up_check.pack(side=RIGHT, padx=5)
-
         self.keys_section_frame = Frame(broadcast_frame)
         self.keys_section_frame.pack(fill="x", padx=5, pady=5)
-
         Label(self.keys_section_frame, text="Keys to broadcast (comma separated):").pack(anchor="w", padx=5, pady=5)
         self.keys_entry = Entry(self.keys_section_frame)
         self.keys_entry.pack(fill="x", padx=5, pady=5)
         self.keys_entry.insert(0, self.keys)
-        
         self.keys_entry.bind("<FocusOut>", self.on_keys_entry_focus_out)
-
         keys_btn_frame = Frame(self.keys_section_frame)
         keys_btn_frame.pack(fill="x", padx=5, pady=5)
-
         self.load_btn = Button(keys_btn_frame, text="Load Keys", command=self.load_keys_from_file)
         self.load_btn.pack(side=LEFT, padx=5)
-
         self.save_btn = Button(keys_btn_frame, text="Save Keys", command=self.save_keys)
         self.save_btn.pack(side=RIGHT, padx=5)
-
         self.broadcast_btn = Button(broadcast_frame, text="Start Broadcasting", command=self.toggle_broadcasting)
         self.broadcast_btn.pack(anchor="center", padx=5, pady=5)
-
-        # Auto Focus Frame
         focus_frame = LabelFrame(self.root, text="Auto Focus")
         focus_frame.pack(fill="x", expand=True, padx=10, pady=10)
-        
-        # Make the frame slightly taller to accommodate the new checkbox
-        focus_frame.configure(height=80)  # Increase the height
-        
+        focus_frame.configure(height=80)
         focus_options_frame = Frame(focus_frame)
         focus_options_frame.pack(fill="x", padx=5, pady=5)
-
-        # Configure a 3-column grid with equal weights
         focus_options_frame.columnconfigure(0, weight=1)
         focus_options_frame.columnconfigure(1, weight=1)
         focus_options_frame.columnconfigure(2, weight=1)
-
-        # Left button
         self.focus_btn = Button(focus_options_frame, text="Enable Auto Focus", command=self.toggle_auto_focus)
         self.focus_btn.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        # Center checkbox
-        self.hide_taskbar_btn = Checkbutton(focus_options_frame, text="Hide taskbar on focus",
-                                              variable=self.hide_taskbar_var)
+        self.hide_taskbar_btn = Checkbutton(focus_options_frame, text="Hide taskbar on focus", variable=self.hide_taskbar_var)
         self.hide_taskbar_btn.grid(row=0, column=1, padx=5, pady=5)
-
-        # Right checkbox
         self.pause_alt_tab_var = BooleanVar(value=True)
-        self.pause_alt_tab_btn = Checkbutton(focus_options_frame, text="Pause on Alt+Tab",
-                                               variable=self.pause_alt_tab_var, command=self.toggle_pause_alt_tab)
+        self.pause_alt_tab_btn = Checkbutton(focus_options_frame, text="Pause on Alt+Tab", variable=self.pause_alt_tab_var, command=self.toggle_pause_alt_tab)
         self.pause_alt_tab_btn.grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        
-        # Log Frame
         log_frame = LabelFrame(self.root, text="Log")
         log_frame.configure(height=100)
         log_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
         log_options_frame = Frame(log_frame)
         log_options_frame.pack(fill="x", padx=5, pady=2, anchor="w")
-
-        self.logging_checkbox = Checkbutton(log_options_frame, text="Enable Logging",
-                                                variable=self.logging_enabled, command=self.toggle_logging)
+        self.logging_checkbox = Checkbutton(log_options_frame, text="Enable Logging", variable=self.logging_enabled, command=self.toggle_logging)
         self.logging_checkbox.pack(side=LEFT, padx=5)
-
         self.log_text = Text(log_frame, height=6, width=40, state="disabled")
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
-
+        self.log_text.pack_forget()  # Hide the log_text widget
         scrollbar = Scrollbar(self.log_text, command=self.log_text.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         self.log_text.config(yscrollcommand=scrollbar.set)
-
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
         snap_settings_frame = Frame(self.window_mgmt_frame)
         snap_settings_frame.pack(fill="x", padx=5, pady=2, before=self.viz_canvas)
-
         Checkbutton(snap_settings_frame, text="Grid Snap", variable=self.grid_snap_enabled).pack(side=LEFT, padx=2)
         Label(snap_settings_frame, text="Grid Size:").pack(side=LEFT, padx=20)
         Spinbox(snap_settings_frame, from_=5, to=50, width=3, textvariable=self.grid_snap_size).pack(side=LEFT, padx=2)
-        #ttk.Checkbutton(snap_settings_frame, text="Snap to Windows", variable=self.window_snap_enabled).pack(side=LEFT, padx=5)
-        #ttk.Checkbutton(snap_settings_frame, text="Snap to Corners", variable=self.corner_snap_enabled).pack(side=LEFT, padx=5)
-
-        self.use_main_window_check = Checkbutton(snap_settings_frame, text="Use Main Window", 
-                                                 variable=self.use_main_window)
+        self.use_main_window_check = Checkbutton(snap_settings_frame, text="Use Main Window", variable=self.use_main_window)
         self.use_main_window_check.pack(side=RIGHT, padx=2)
-
-        
-        self.main_window_combo = Combobox(snap_settings_frame, textvariable=self.main_window_index, 
-                                         values=[i for i in range(1, 9)], width=2)
+        self.main_window_combo = Combobox(snap_settings_frame, textvariable=self.main_window_index, values=[i for i in range(1, 9)], width=2)
         self.main_window_combo.pack(side=RIGHT, padx=2)
         self.main_window_combo.set("1")
-        self.main_window_combo.pack_forget() # Not sure where to display this yet
+        self.main_window_combo.pack_forget()
 
     def get_all_windows(self):
         all_windows = []
         selected_monitor = self.get_selected_monitor()
+        
         for window in gw.getAllWindows():
             if window.title and window.title.strip() and self.is_window_on_monitor(window, selected_monitor):
-                all_windows.append(window.title)
+                sanitized_title = self.sanitize_window_title(window.title)
+                if sanitized_title:  # Only add if the title is not empty after sanitization
+                    all_windows.append(sanitized_title)
+        
         return sorted(all_windows)
+        
+    def sanitize_window_title(self, title):
+        allowed_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_@. ")
+        sanitized_title = ''.join(char for char in title if char in allowed_chars)
+        
+        max_length = 100
+        if len(sanitized_title) > max_length:
+            sanitized_title = sanitized_title[:max_length] + "..."
+        
+        return sanitized_title
         
     def get_selected_monitor(self):
         monitor_name = self.selected_monitor.get()
@@ -549,43 +458,28 @@ class AutoKeyBroadcaster:
     def is_window_on_monitor(self, window, monitor):
         if not monitor:
             return False
-        return (window.left >= monitor['x'] and
-                window.right <= monitor['x'] + monitor['width'] and
-                window.top >= monitor['y'] and
-                window.bottom <= monitor['y'] + monitor['height'])
-                
+        return (window.left >= monitor['x'] and window.right <= monitor['x'] + monitor['width'] and window.top >= monitor['y'] and window.bottom <= monitor['y'] + monitor['height'])
+
     def sanitize_keys(self, keys_string):
-        # Split input by commas
         raw_keys = [k.strip() for k in keys_string.split(',')]
         valid_keys = []
-        
-        # Define allowable keys
         allowed_single_chars = set("abcdefghijklmnopqrstuvwxyz0123456789")
-        allowed_special_keys = {
-            'space', 'tab', 'enter', 'shift', 'alt', 'ctrl',
-            'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'
-        }
-        
-        # Validate each key
+        allowed_special_keys = {'space', 'tab', 'enter', 'shift', 'alt', 'ctrl', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'}
         for key in raw_keys:
             if (len(key) == 1 and key.lower() in allowed_single_chars) or key.lower() in allowed_special_keys:
                 valid_keys.append(key.lower())
-        
         return ','.join(valid_keys)
-        
+
     def on_keys_entry_focus_out(self, event):
-        # Sanitize the keys first
         sanitized_keys = self.sanitize_keys(self.keys_entry.get())
         self.keys_entry.delete(0, END)
         self.keys_entry.insert(0, sanitized_keys)
         self.keys = sanitized_keys
-        
         if self.is_broadcasting and not self.broadcast_all_keys.get():
-            # Restart broadcasting with sanitized keys
             self.is_broadcasting = False
             self.toggle_broadcasting()
             self.log("Broadcasting restarted with updated keys")
-        
+
     def setup_window_management_frame(self):
         app_width = self.root.winfo_width()
         app_height = self.root.winfo_height()
@@ -617,12 +511,7 @@ class AutoKeyBroadcaster:
         canvas_width = self.viz_canvas.winfo_width()
         canvas_height = self.viz_canvas.winfo_height()
         self.screen_scale = min(canvas_width / screen_width, canvas_height / screen_height)
-        self.viz_canvas.create_rectangle(
-            0, 0,
-            screen_width * self.screen_scale,
-            screen_height * self.screen_scale,
-            outline="white", width=2
-        )
+        self.viz_canvas.create_rectangle(0, 0, screen_width * self.screen_scale, screen_height * self.screen_scale, outline="white", width=2)
         target_windows = self.get_target_windows()
         colors = ["red", "green", "blue", "yellow", "cyan", "magenta", "orange", "purple", "brown", "pink"]
         target_windows.sort(key=lambda w: (w.top, w.left))
@@ -633,52 +522,19 @@ class AutoKeyBroadcaster:
                 y1 = (window.top - selected_monitor['y']) * self.screen_scale
                 x2 = (window.right - selected_monitor['x']) * self.screen_scale
                 y2 = (window.bottom - selected_monitor['y']) * self.screen_scale
-                rect_id = self.viz_canvas.create_rectangle(
-                    x1, y1, x2, y2,
-                    fill=color, outline="white", width=1,
-                    tags=f"window_{i}"
-                )
-                self.viz_canvas.create_text(
-                    x1 + 10, y1 + 10,
-                    text=f"#{i+1}",
-                    fill="white",
-                    font=("Arial", 10, "bold"),
-                    tags=f"window_{i}"
-                )
+                rect_id = self.viz_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="white", width=1, tags=f"window_{i}")
+                self.viz_canvas.create_text(x1 + 10, y1 + 10, text=f"#{i+1}", fill="white", font=("Arial", 10, "bold"), tags=f"window_{i}")
                 title = window.title if len(window.title) < 20 else window.title[:17] + "..."
-                self.viz_canvas.create_text(
-                    (x1 + x2) / 2, (y1 + y2) / 2,
-                    text=title, fill="white", font=("Arial", 8),
-                    tags=f"window_{i}"
-                )
-                resize_handle = self.viz_canvas.create_polygon(
-                    x2, y2 - 10, x2 - 10, y2, x2, y2,
-                    fill="white", outline="black", width=1,
-                    tags=f"resize_{i}"
-                )
-                self.window_rects[rect_id] = {
-                    "window": window,
-                    "index": i,
-                    "original_geometry": (window.left, window.top, window.right, window.bottom),
-                    "resize_handle": resize_handle
-                }
+                self.viz_canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, text=title, fill="white", font=("Arial", 8), tags=f"window_{i}")
+                resize_handle = self.viz_canvas.create_polygon(x2, y2 - 10, x2 - 10, y2, x2, y2, fill="white", outline="black", width=1, tags=f"resize_{i}")
+                self.window_rects[rect_id] = {"window": window, "index": i, "original_geometry": (window.left, window.top, window.right, window.bottom), "resize_handle": resize_handle}
         if not target_windows:
-            self.viz_canvas.create_text(
-                canvas_width / 2, canvas_height / 2,
-                text="No windows selected", fill="white", font=("Arial", 12)
-            )
+            self.viz_canvas.create_text(canvas_width / 2, canvas_height / 2, text="No windows selected", fill="white", font=("Arial", 12))
 
     def start_window_drag(self, event):
         closest = self.viz_canvas.find_closest(event.x, event.y)
         if closest and closest[0] in self.window_rects:
-            self.dragging_window = {
-                "id": closest[0],
-                "start_x": event.x,
-                "start_y": event.y,
-                "original_coords": self.viz_canvas.coords(closest[0]),
-                "canvas_width": self.viz_canvas.winfo_width(),
-                "canvas_height": self.viz_canvas.winfo_height()
-            }
+            self.dragging_window = {"id": closest[0], "start_x": event.x, "start_y": event.y, "original_coords": self.viz_canvas.coords(closest[0]), "canvas_width": self.viz_canvas.winfo_width(), "canvas_height": self.viz_canvas.winfo_height()}
             self.viz_canvas.itemconfig(closest[0], width=2)
             window_info = self.window_rects[closest[0]]
             for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
@@ -800,12 +656,7 @@ class AutoKeyBroadcaster:
                         rect_id = rid
                         break
                 if rect_id:
-                    self.resizing_window = {
-                        "id": rect_id,
-                        "start_x": event.x,
-                        "start_y": event.y,
-                        "original_coords": self.viz_canvas.coords(rect_id)
-                    }
+                    self.resizing_window = {"id": rect_id, "start_x": event.x, "start_y": event.y, "original_coords": self.viz_canvas.coords(rect_id)}
                     self.viz_canvas.itemconfig(rect_id, width=2)
                     window_info = self.window_rects[rect_id]
                     for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
@@ -854,10 +705,7 @@ class AutoKeyBroadcaster:
             resize_handle = item
             break
         if resize_handle:
-            self.viz_canvas.coords(resize_handle,
-                new_x2, new_y2 - 10,
-                new_x2 - 10, new_y2,
-                new_x2, new_y2)
+            self.viz_canvas.coords(resize_handle, new_x2, new_y2 - 10, new_x2 - 10, new_y2, new_x2, new_y2)
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
             if item != self.resizing_window["id"] and "text" in self.viz_canvas.type(item):
                 self.viz_canvas.coords(item, (new_x1 + new_x2) / 2, (new_y1 + new_y2) / 2)
@@ -900,9 +748,7 @@ class AutoKeyBroadcaster:
                 else:
                     new_style = style | win32con.WS_CAPTION | win32con.WS_THICKFRAME
                     win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, new_style)
-                win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-                   win32con.SWP_NOMOVE | win32con.SWP_NOSIZE |
-                   win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
+                win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
             except Exception as e:
                 self.log(f"Error toggling borderless mode: {str(e)}")
         mode = "borderless" if borderless else "normal"
@@ -913,18 +759,14 @@ class AutoKeyBroadcaster:
         if not target_windows:
             self.log("No windows to layout")
             return
-        
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_count = len(target_windows)
-        
         use_main_window = self.use_main_window.get()
-        main_window_idx = self.main_window_index.get() - 1  # Convert to 0-based index
-        
+        main_window_idx = self.main_window_index.get() - 1
         if use_main_window and 0 <= main_window_idx < window_count:
             main_window = target_windows.pop(main_window_idx)
             target_windows.insert(0, main_window)
-            
             if aspect_ratio == "1:1":
                 self.layout_with_main_window_grid(target_windows, screen_width, screen_height)
             elif aspect_ratio == "16:9":
@@ -950,22 +792,14 @@ class AutoKeyBroadcaster:
                 else:
                     rows = 2
                     cols = (window_count + 1) // 2
-                
-                # Calculate cell dimensions
                 cell_width = screen_width // cols
                 cell_height = screen_height // rows
-                
-                # Adjust to maintain 16:9 aspect ratio
                 if cell_width / cell_height > 16/9:
                     cell_width = int(cell_height * 16/9)
                 else:
                     cell_height = int(cell_width * 9/16)
-                
-                # Calculate padding to center windows
                 padding_x = (screen_width - (cols * cell_width)) // 2
                 padding_y = (screen_height - (rows * cell_height)) // 2
-                
-                # Position windows
                 for i, window in enumerate(target_windows):
                     row = i // cols
                     col = i % cols
@@ -975,7 +809,7 @@ class AutoKeyBroadcaster:
                         window.moveTo(x, y)
                         window.resizeTo(cell_width, cell_height)
                     except Exception as e:
-                        self.log(f"Error arranging window: {str(e)}")         
+                        self.log(f"Error arranging window: {str(e)}")
             elif aspect_ratio == "21:9":
                 cols = int((window_count * 21 / 9) ** 0.5)
                 if cols == 0:
@@ -996,47 +830,32 @@ class AutoKeyBroadcaster:
                     window.resizeTo(cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error arranging window: {str(e)}")
-                    
         self.update_window_visualization()
+
     def layout_with_main_window_grid(self, target_windows, screen_width, screen_height):
         if not target_windows:
             return
-            
         window_count = len(target_windows)
         main_window = target_windows[0]
         secondary_windows = target_windows[1:]
         secondary_count = len(secondary_windows)
-        
-        # Main window takes 2/3 of screen width and height
         main_width = int(screen_width * 0.6)
         main_height = int(screen_height * 0.6)
-        
-        # Position main window in upper left
         try:
             main_window.moveTo(0, 0)
             main_window.resizeTo(main_width, main_height)
             self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
         except Exception as e:
             self.log(f"Error positioning main window: {str(e)}")
-        
         if secondary_count <= 0:
             return
-            
-        # Calculate grid for secondary windows
-        # Right side of main window
         right_width = screen_width - main_width
         right_height = screen_height
-        
-        # Bottom of main window
         bottom_width = main_width
         bottom_height = screen_height - main_height
-        
-        # Determine how to distribute secondary windows
         if secondary_count <= 3:
-            # Place all secondary windows on the right
             cell_width = right_width
             cell_height = right_height // secondary_count
-            
             for i, window in enumerate(secondary_windows):
                 x = main_width
                 y = i * cell_height
@@ -1046,14 +865,10 @@ class AutoKeyBroadcaster:
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         else:
-            # Place some windows on right, some on bottom
             right_count = min(3, secondary_count // 2)
             bottom_count = secondary_count - right_count
-            
-            # Right side windows
             cell_width = right_width
             cell_height = right_height // right_count
-            
             for i in range(right_count):
                 window = secondary_windows[i]
                 x = main_width
@@ -1063,11 +878,8 @@ class AutoKeyBroadcaster:
                     window.resizeTo(cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
-            
-            # Bottom windows
             cell_width = bottom_width // bottom_count
             cell_height = bottom_height
-            
             for i in range(bottom_count):
                 window = secondary_windows[i + right_count]
                 x = i * cell_width
@@ -1077,44 +889,31 @@ class AutoKeyBroadcaster:
                     window.resizeTo(cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
-        
         self.log(f"Arranged {window_count} windows with main window layout")
 
     def layout_with_main_window_widescreen(self, target_windows, screen_width, screen_height, aspect_ratio):
         if not target_windows:
             return
-            
         window_count = len(target_windows)
         main_window = target_windows[0]
         secondary_windows = target_windows[1:]
         secondary_count = len(secondary_windows)
-        
-        # Main window takes 2/3 of screen width and maintains aspect ratio
         main_width = int(screen_width * 0.65)
         main_height = int(main_width / aspect_ratio)
-        
-        # Make sure main window doesn't exceed screen height
         if main_height > screen_height * 0.7:
             main_height = int(screen_height * 0.7)
             main_width = int(main_height * aspect_ratio)
-        
-        # Position main window in upper left
         try:
             main_window.moveTo(0, 0)
             main_window.resizeTo(main_width, main_height)
             self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
         except Exception as e:
             self.log(f"Error positioning main window: {str(e)}")
-        
         if secondary_count <= 0:
             return
-        
-        # Arrange secondary windows based on count
         if secondary_count <= 2:
-            # Stack vertically on right side
             sec_width = screen_width - main_width
             sec_height = screen_height // secondary_count
-            
             for i, window in enumerate(secondary_windows):
                 x = main_width
                 y = i * sec_height
@@ -1124,14 +923,10 @@ class AutoKeyBroadcaster:
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         else:
-            # Arrange in L shape (right and bottom)
             right_count = min(2, secondary_count // 2)
             bottom_count = secondary_count - right_count
-            
-            # Right side windows
             right_width = screen_width - main_width
             right_height = screen_height // right_count
-            
             for i in range(right_count):
                 window = secondary_windows[i]
                 x = main_width
@@ -1141,11 +936,8 @@ class AutoKeyBroadcaster:
                     window.resizeTo(right_width, right_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
-            
-            # Bottom windows
             bottom_width = main_width // bottom_count
             bottom_height = screen_height - main_height
-            
             for i in range(bottom_count):
                 window = secondary_windows[i + right_count]
                 x = i * bottom_width
@@ -1155,7 +947,6 @@ class AutoKeyBroadcaster:
                     window.resizeTo(bottom_width, bottom_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
-        
         self.log(f"Arranged {window_count} windows with main window widescreen layout ({aspect_ratio})")
 
     def auto_fill(self):
@@ -1163,56 +954,36 @@ class AutoKeyBroadcaster:
         if not target_windows:
             self.log("No windows to layout")
             return
-            
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_count = len(target_windows)
-        
-        # Handle main window mode
         use_main_window = self.use_main_window.get()
-        main_window_idx = self.main_window_index.get() - 1  # Convert to 0-based index
-        
+        main_window_idx = self.main_window_index.get() - 1
         if use_main_window and 0 <= main_window_idx < window_count:
             main_window = target_windows.pop(main_window_idx)
             target_windows.insert(0, main_window)
-            
-            # Main window takes half the screen
             main_width = int(screen_width * 0.6)
             main_height = int(screen_height * 0.6)
-            
-            # Position main window in upper left
             try:
                 main_window.moveTo(0, 0)
                 main_window.resizeTo(main_width, main_height)
             except Exception as e:
                 self.log(f"Error positioning main window: {str(e)}")
-                
-            # Arrange remaining windows
             remaining_windows = target_windows[1:]
             if remaining_windows:
-                # Right area
                 right_width = screen_width - main_width
                 right_area = right_width * screen_height
-                
-                # Bottom area
                 bottom_width = main_width
                 bottom_height = screen_height - main_height
                 bottom_area = bottom_width * bottom_height
-                
-                # Total secondary area
                 total_secondary_area = right_area + bottom_area
-                
-                # Windows per area proportional to area size
                 right_windows_count = max(1, int(len(remaining_windows) * (right_area / total_secondary_area)))
                 bottom_windows_count = len(remaining_windows) - right_windows_count
-                
-                # Right windows
                 if right_windows_count > 0:
                     cols = 1
                     rows = right_windows_count
                     cell_width = right_width / cols
                     cell_height = screen_height / rows
-                    
                     for i in range(right_windows_count):
                         window = remaining_windows[i]
                         row = i // cols
@@ -1224,14 +995,11 @@ class AutoKeyBroadcaster:
                             window.resizeTo(int(cell_width), int(cell_height))
                         except Exception as e:
                             self.log(f"Error arranging window: {str(e)}")
-                
-                # Bottom windows
                 if bottom_windows_count > 0:
                     cols = bottom_windows_count
                     rows = 1
                     cell_width = main_width / cols
                     cell_height = bottom_height / rows
-                    
                     for i in range(bottom_windows_count):
                         window = remaining_windows[i + right_windows_count]
                         row = i // cols
@@ -1244,7 +1012,6 @@ class AutoKeyBroadcaster:
                         except Exception as e:
                             self.log(f"Error arranging window: {str(e)}")
         else:
-            # Original auto fill logic
             cols = int(window_count ** 0.5)
             if cols * cols < window_count:
                 cols += 1
@@ -1261,10 +1028,9 @@ class AutoKeyBroadcaster:
                     window.resizeTo(cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error arranging window: {str(e)}")
-                    
         self.log(f"Arranged {window_count} windows to fill the screen")
         self.update_window_visualization()
-    
+
     def toggle_logging(self):
         if self.logging_enabled.get():
             self.log("Logging enabled")
@@ -1279,21 +1045,20 @@ class AutoKeyBroadcaster:
             self.save_btn.config(state="disabled")
             self.broadcast_select.config(state="disabled")
             self.broadcast_select_keys.set(False)
-            self.broadcast_btn.config(state="normal")  # Enable broadcast button
+            self.broadcast_btn.config(state="normal")
         elif self.broadcast_select_keys.get():
             self.broadcast_all_keys.set(False)
             self.broadcast_all.config(state="disabled")
-            self.broadcast_btn.config(state="normal")  # Enable broadcast button
+            self.broadcast_btn.config(state="normal")
         else:
             self.keys_entry.config(state="normal")
             self.load_btn.config(state="normal")
             self.save_btn.config(state="normal")
             self.broadcast_select.config(state="normal")
             self.broadcast_all.config(state="normal")
-            self.broadcast_btn.config(state="disabled")  # Disable broadcast button
-            
+            self.broadcast_btn.config(state="disabled")
         self.save_profile_settings()
-        
+
     def load_keys_from_file(self):
         self.load_keys()
         self.keys_entry.delete(0, END)
@@ -1326,10 +1091,11 @@ class AutoKeyBroadcaster:
             target_windows = self.get_target_windows()
             self.log(f"Found {len(target_windows)} matching windows for '{self.target_window_pattern.get()}'")
             self.update_window_visualization()
+
     def on_monitor_selected(self, event):
         self.refresh_window_list()
         self.update_window_visualization()
-        
+
     def toggle_broadcasting(self):
         if not self.is_broadcasting:
             if not self.target_window_pattern.get():
@@ -1394,106 +1160,82 @@ class AutoKeyBroadcaster:
     def broadcast_selected_keys(self):
         prev_key_states = {}
         key_hold_times = {}
-        key_repeat_delay = 0.5  # Initial delay before repeating in seconds
-        key_repeat_rate = 0.03  # Repeat rate in seconds
-
+        key_repeat_delay = 0.5
+        key_repeat_rate = 0.03
         while self.is_broadcasting and self.running:
             keys = [k.strip() for k in self.sanitize_keys(self.keys_entry.get()).split(',')]
             current_time = time.time()
-
-            # Initialize tracking for new keys
             for key in keys:
                 if key not in prev_key_states:
                     prev_key_states[key] = False
                     key_hold_times[key] = 0
-
             try:
                 target_windows = self.get_target_windows()
                 active_window = gw.getActiveWindow()
-
                 if target_windows and any(window == active_window for window in target_windows):
                     for key in keys:
                         current_state = keyboard.is_pressed(key)
-
-                        if current_state:  # Key is pressed
-                            if not prev_key_states[key]:  # First press
-                                if not self.only_on_key_up_var.get():  # Only send if not in "only on key up" mode
-                                    for window in target_windows:
-                                        if window != active_window:
-                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN,
-                                                                 ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
-                                key_hold_times[key] = current_time
-                            elif current_time - key_hold_times[key] > key_repeat_delay:
-                                # After delay, send key repeatedly (only if not in "only on key up" mode)
+                        if current_state:
+                            if not prev_key_states[key]:
                                 if not self.only_on_key_up_var.get():
                                     for window in target_windows:
                                         if window != active_window:
-                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN,
-                                                                 ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
-                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
-                        else:  # Key is released
-                            if prev_key_states[key]:  # Previously pressed
-                                # Always send key up events
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
+                                key_hold_times[key] = current_time
+                            elif current_time - key_hold_times[key] > key_repeat_delay:
+                                if not self.only_on_key_up_var.get():
+                                    for window in target_windows:
+                                        if window != active_window:
+                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
+                                key_hold_times[key] += key_repeat_rate
+                        else:
+                            if prev_key_states[key]:
                                 for window in target_windows:
                                     if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYUP,
-                                                             ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
-
+                                        win32api.PostMessage(window._hWnd, self.WM_KEYUP, ord(key.upper()) if len(key) == 1 else self.get_vk_code(key), 0)
                         prev_key_states[key] = current_state
             except Exception as e:
                 self.log(f"Error: {str(e)}")
             time.sleep(0.01)
-            
+
     def broadcast_all_keyboard(self):
-        all_keys = [
-            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-            'space', 'tab', 'enter', 'shift', 'alt', 'ctrl',
-            'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
-        ]
+        all_keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'space', 'tab', 'enter', 'shift', 'alt', 'ctrl', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12']
         prev_key_states = {key: False for key in all_keys}
         key_hold_times = {key: 0 for key in all_keys}
-        key_repeat_delay = 0.5  # Initial delay before repeating in seconds
-        key_repeat_rate = 0.03  # Repeat rate in seconds
-
+        key_repeat_delay = 0.5
+        key_repeat_rate = 0.03
         while self.is_broadcasting and self.running:
             try:
                 target_windows = self.get_target_windows()
                 active_window = gw.getActiveWindow()
                 current_time = time.time()
-
                 if target_windows and any(window == active_window for window in target_windows):
                     for key in all_keys:
                         current_state = keyboard.is_pressed(key)
                         vk_code = self.get_vk_code(key)
-
-                        if current_state and vk_code:  # Key is pressed
-                            if not prev_key_states[key]:  # First press
-                                if not self.only_on_key_up_var.get():  # Only send if not in "only on key up" mode
+                        if current_state and vk_code:
+                            if not prev_key_states[key]:
+                                if not self.only_on_key_up_var.get():
                                     for window in target_windows:
                                         if window != active_window:
                                             win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
                                 key_hold_times[key] = current_time
                             elif current_time - key_hold_times[key] > key_repeat_delay:
-                                # After delay, send key repeatedly (only if not in "only on key up" mode)
                                 if not self.only_on_key_up_var.get():
                                     for window in target_windows:
                                         if window != active_window:
                                             win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
-                                key_hold_times[key] += key_repeat_rate  # Schedule next repeat
-                        else:  # Key is released
-                            if prev_key_states[key]:  # Previously pressed
-                                # Always send key up events
+                                key_hold_times[key] += key_repeat_rate
+                        else:
+                            if prev_key_states[key]:
                                 for window in target_windows:
                                     if window != active_window:
                                         win32api.PostMessage(window._hWnd, self.WM_KEYUP, vk_code, 0)
-
                         prev_key_states[key] = current_state
             except Exception as e:
                 self.log(f"Error: {str(e)}")
             time.sleep(0.01)
-     
+
     def get_vk_code(self, key):
         special_keys = {
             'space': win32con.VK_SPACE,
@@ -1537,7 +1279,6 @@ class AutoKeyBroadcaster:
 
     def auto_focus(self):
         last_focused_window = None
-        
         while self.is_auto_focusing and self.running:
             if self.is_auto_focusing_paused:
                 time.sleep(0.1)
@@ -1546,17 +1287,11 @@ class AutoKeyBroadcaster:
                 mouse_x, mouse_y = pyautogui.position()
                 target_windows = self.get_target_windows()
                 current_window = gw.getActiveWindow()
-                
-                # Check if we're still focusing on a target window
                 current_is_target = any(window == current_window for window in target_windows)
-                
-                # If we moved from a target window to a non-target window, show taskbar
                 if last_focused_window and not current_is_target and self.hide_taskbar_var.get():
                     self.toggle_taskbar(hide=False)
-                
                 for window in target_windows:
-                    if (window.left <= mouse_x <= window.right and
-                        window.top <= mouse_y <= window.bottom):
+                    if (window.left <= mouse_x <= window.right and window.top <= mouse_y <= window.bottom):
                         if window != current_window and self.is_window_at_top(window, mouse_x, mouse_y):
                             hwnd = window._hWnd
                             foreground_hwnd = ctypes.windll.user32.GetForegroundWindow()
@@ -1572,11 +1307,8 @@ class AutoKeyBroadcaster:
                                 if ctypes.windll.user32.GetForegroundWindow() == hwnd:
                                     self.log(f"Focus changed to: {window.title}")
                                     last_focused_window = window
-                                    
-                                    # Hide taskbar if the option is enabled
                                     if self.hide_taskbar_var.get():
                                         self.toggle_taskbar(hide=True)
-                                    
                                     break
                             except Exception as e:
                                 self.log(f"Error details: {type(e).__name__}: {str(e)}")
@@ -1593,12 +1325,10 @@ class AutoKeyBroadcaster:
             except Exception as e:
                 self.log(f"Error: {type(e).__name__}: {str(e)}")
             time.sleep(0.05)
-        
+
     def on_closing(self):
-        # Show taskbar if it was hidden
         if self.taskbar_hidden:
             self.toggle_taskbar(hide=False)
-            
         self.save_profile_settings()
         self.running = False
         self.is_broadcasting = False
@@ -1608,7 +1338,7 @@ class AutoKeyBroadcaster:
         if self.focus_thread and self.focus_thread.is_alive():
             self.focus_thread.join(1)
         self.root.destroy()
-        
+
 class MonitorInfo:
     def __init__(self):
         self.monitors = self.get_monitor_info()
@@ -1616,18 +1346,10 @@ class MonitorInfo:
     def get_monitor_info(self):
         monitors = []
         monitor_enum_proc = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_double)
-
         def callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
-            monitor_info = {
-                'name': win32api.GetMonitorInfo(hMonitor)['Device'],
-                'width': lprcMonitor.contents.right - lprcMonitor.contents.left,
-                'height': lprcMonitor.contents.bottom - lprcMonitor.contents.top,
-                'x': lprcMonitor.contents.left,
-                'y': lprcMonitor.contents.top
-            }
+            monitor_info = {'name': win32api.GetMonitorInfo(hMonitor)['Device'], 'width': lprcMonitor.contents.right - lprcMonitor.contents.left, 'height': lprcMonitor.contents.bottom - lprcMonitor.contents.top, 'x': lprcMonitor.contents.left, 'y': lprcMonitor.contents.top}
             monitors.append(monitor_info)
             return 1
-
         ctypes.windll.user32.EnumDisplayMonitors(None, None, monitor_enum_proc(callback), 0)
         return monitors
 
@@ -1642,7 +1364,7 @@ class MonitorInfo:
             if monitor['name'] == name:
                 return monitor
         return None
-        
+
 if __name__ == "__main__":
     root = Tk()
     app = AutoKeyBroadcaster(root)
