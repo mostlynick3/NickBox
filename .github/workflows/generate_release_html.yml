@@ -1,0 +1,36 @@
+name: Generate Release HTML
+
+on:
+  release:
+    types: [published]  # Trigger the action when a new release is published
+
+jobs:
+  generate-html:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Fetch Releases
+      run: |
+        # Get all releases using GitHub API
+        curl -s https://api.github.com/repos/${{ github.repository }}/releases > releases.json
+
+    - name: Generate HTML file from releases
+      run: |
+        # Create a basic HTML structure
+        echo "<html><head><title>Releases</title></head><body>" > releases.html
+        echo "<h1>Release List</h1>" >> releases.html
+        # Loop through releases and append them to the HTML
+        jq -r '.[] | "<p><strong>\(.name)</strong> - \(.tag_name)</p><p>\(.body)</p><hr>"' releases.json >> releases.html
+        echo "</body></html>" >> releases.html
+
+    - name: Commit generated HTML
+      uses: EndBug/add-and-commit@v7
+      with:
+        author_name: 'GitHub Actions'
+        author_email: 'actions@github.com'
+        message: 'Update releases.html with new release'
+        add: 'releases.html'
+i ask
