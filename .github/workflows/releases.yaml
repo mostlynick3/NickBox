@@ -16,7 +16,7 @@ jobs:
         run: |
           echo "<!DOCTYPE html><html><head><title>Releases</title></head><body><h1>Releases</h1><ul>" > releases.html
           curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | 
-          jq -r '.[] | "<li><a href=\"\(.html_url)\">\(.tag_name): \(.name)</a> (\(.published_at | fromjson | strftime("%Y-%m-%d"))) - Assets: " + (.assets | map("<a href=\"\(.browser_download_url)\">\(.name)</a>") | join(", ")) + "</li>"' >> releases.html
+          jq -r '.[] | "<li><a href=\"\(.html_url)\">\(.tag_name): \(.name)</a> (\(.published_at | sub("T.*Z"; ""))) - Assets: " + (.assets | map("<a href=\"\(.browser_download_url)\">\(.name)</a>") | join(", ")) + "</li>"' >> releases.html
           echo "</ul></body></html>" >> releases.html
       
       - name: Commit and push
