@@ -1,10 +1,10 @@
+import platform
+import os
 import threading
 import time
 import base64
-import os
 import tempfile
 import csv
-import ctypes
 import json
 from datetime import datetime
 from tkinter import Tk, Canvas, StringVar, BooleanVar, IntVar, filedialog, LEFT, RIGHT, Text, X, Y, Spinbox, END
@@ -17,6 +17,7 @@ import win32gui
 import win32con
 import win32api
 import win32process
+import ctypes
 
 class AutoKeyBroadcaster:
     def __init__(self, root):
@@ -89,7 +90,41 @@ class AutoKeyBroadcaster:
         icon_thread = threading.Thread(target=_create_icon)
         icon_thread.daemon = True
         icon_thread.start()
+    def get_window_dpi_awareness(self, hwnd):
+        try:
+            _, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            process_handle = win32api.OpenProcess(win32con.PROCESS_QUERY_INFORMATION, False, process_id)
+            
+            if process_handle:
+                try:
+                    return True
+                finally:
+                    win32api.CloseHandle(process_handle)
+        except:
+            pass
+        return False
 
+    def position_window_correctly(self, window, x, y, width, height):
+        try:
+            hwnd = window._hWnd
+            
+            current_rect = win32gui.GetWindowRect(hwnd)
+            
+            win32gui.SetWindowPos(
+                hwnd,
+                win32con.HWND_TOP,
+                x, y, width, height,
+                win32con.SWP_NOZORDER | win32con.SWP_NOACTIVATE
+            )
+            
+            new_rect = win32gui.GetWindowRect(hwnd)
+            actual_x, actual_y = new_rect[0], new_rect[1]
+            
+            if abs(actual_x - x) > 5 or abs(actual_y - y) > 5:
+                self.log(f"Position mismatch: requested ({x},{y}), actual ({actual_x},{actual_y})")
+                
+        except Exception as e:
+            self.log(f"Error positioning window: {str(e)}")
     def set_window_icon(self):
         if self.icon_path and os.path.exists(self.icon_path):
             self.root.iconbitmap(self.icon_path)
@@ -412,7 +447,7 @@ class AutoKeyBroadcaster:
         self.logging_checkbox.pack(side=LEFT, padx=5)
         self.log_text = Text(log_frame, height=6, width=40, state="disabled")
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
-        self.log_text.pack_forget()  # Hide the log_text widget
+        self.log_text.pack_forget()
         scrollbar = Scrollbar(self.log_text, command=self.log_text.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         self.log_text.config(yscrollcommand=scrollbar.set)
@@ -430,27 +465,30 @@ class AutoKeyBroadcaster:
         self.main_window_combo.pack_forget()
 
     def get_all_windows(self):
+        return self.get_all_windows_windows()
+
+    def get_all_windows_windows(self):
         all_windows = []
         selected_monitor = self.get_selected_monitor()
-        
+
         for window in gw.getAllWindows():
             if window.title and window.title.strip() and self.is_window_on_monitor(window, selected_monitor):
                 sanitized_title = self.sanitize_window_title(window.title)
-                if sanitized_title:  # Only add if the title is not empty after sanitization
+                if sanitized_title:
                     all_windows.append(sanitized_title)
-        
+
         return sorted(all_windows)
-        
+
     def sanitize_window_title(self, title):
         allowed_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_@. ")
         sanitized_title = ''.join(char for char in title if char in allowed_chars)
-        
+
         max_length = 100
         if len(sanitized_title) > max_length:
             sanitized_title = sanitized_title[:max_length] + "..."
-        
+
         return sanitized_title
-        
+
     def get_selected_monitor(self):
         monitor_name = self.selected_monitor.get()
         return self.monitor_info.get_monitor_by_name(monitor_name)
@@ -624,8 +662,7 @@ class AutoKeyBroadcaster:
         width = new_right - new_left
         height = new_bottom - new_top
         try:
-            window.moveTo(new_left, new_top)
-            window.resizeTo(width, height)
+            self.position_window_correctly(window, new_left, new_top, width, height)
             self.log(f"Moved window '{window.title}' to ({new_left}, {new_top}) with size {width}x{height}")
         except Exception as e:
             self.log(f"Error moving window: {str(e)}")
@@ -638,7 +675,7 @@ class AutoKeyBroadcaster:
             self.viz_canvas.itemconfig(resize_handle, state="normal")
         self.dragging_window = None
         self.update_window_visualization()
-
+    
     def start_window_resize(self, event):
         closest = self.viz_canvas.find_closest(event.x, event.y)
         if not closest:
@@ -724,8 +761,7 @@ class AutoKeyBroadcaster:
         width = new_right - new_left
         height = new_bottom - new_top
         try:
-            window.moveTo(new_left, new_top)
-            window.resizeTo(width, height)
+            self.position_window_correctly(window, new_left, new_top, width, height)
         except Exception as e:
             print(f"Error resizing window: {str(e)}")
         self.viz_canvas.itemconfig(rect_id, width=1)
@@ -734,26 +770,45 @@ class AutoKeyBroadcaster:
                 self.viz_canvas.itemconfig(item, state="normal")
         self.resizing_window = None
         self.update_window_visualization()
-
+    
     def toggle_borderless(self):
         target_windows = self.get_target_windows()
         borderless = self.borderless_var.get()
+        
         for window in target_windows:
             try:
                 hwnd = window._hWnd
-                style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
+                
+                rect = win32gui.GetWindowRect(hwnd)
+                current_x, current_y = rect[0], rect[1]
+                current_width, current_height = rect[2] - rect[0], rect[3] - rect[1]
+                
                 if borderless:
+                    style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
                     new_style = style & ~(win32con.WS_CAPTION | win32con.WS_THICKFRAME)
                     win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, new_style)
+                    
+                    win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 
+                                        win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | 
+                                        win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
+                    
+                    win32gui.SendMessage(hwnd, win32con.WM_SIZE, win32con.SIZE_RESTORED, 
+                                       (current_height << 16) | current_width)
+                    
                 else:
+                    style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
                     new_style = style | win32con.WS_CAPTION | win32con.WS_THICKFRAME
                     win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, new_style)
-                win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
+                    win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
+                                        win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | 
+                                        win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
+                    
             except Exception as e:
                 self.log(f"Error toggling borderless mode: {str(e)}")
+        
         mode = "borderless" if borderless else "normal"
         self.log(f"Set {len(target_windows)} windows to {mode} mode")
-
+    
     def auto_layout(self, aspect_ratio):
         target_windows = self.get_target_windows()
         if not target_windows:
@@ -806,8 +861,7 @@ class AutoKeyBroadcaster:
                     x = padding_x + (col * cell_width)
                     y = padding_y + (row * cell_height)
                     try:
-                        window.moveTo(x, y)
-                        window.resizeTo(cell_width, cell_height)
+                        self.position_window_correctly(window, x, y, cell_width, cell_height)
                     except Exception as e:
                         self.log(f"Error arranging window: {str(e)}")
             elif aspect_ratio == "21:9":
@@ -826,12 +880,11 @@ class AutoKeyBroadcaster:
                 x = col * cell_width
                 y = row * cell_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(cell_width, cell_height)
+                    self.position_window_correctly(window, x, y, cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error arranging window: {str(e)}")
         self.update_window_visualization()
-
+    
     def layout_with_main_window_grid(self, target_windows, screen_width, screen_height):
         if not target_windows:
             return
@@ -842,8 +895,7 @@ class AutoKeyBroadcaster:
         main_width = int(screen_width * 0.6)
         main_height = int(screen_height * 0.6)
         try:
-            main_window.moveTo(0, 0)
-            main_window.resizeTo(main_width, main_height)
+            self.position_window_correctly(main_window, 0, 0, main_width, main_height)
             self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
         except Exception as e:
             self.log(f"Error positioning main window: {str(e)}")
@@ -860,8 +912,7 @@ class AutoKeyBroadcaster:
                 x = main_width
                 y = i * cell_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(cell_width, cell_height)
+                    self.position_window_correctly(window, x, y, cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         else:
@@ -874,8 +925,7 @@ class AutoKeyBroadcaster:
                 x = main_width
                 y = i * cell_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(cell_width, cell_height)
+                    self.position_window_correctly(window, x, y, cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
             cell_width = bottom_width // bottom_count
@@ -885,8 +935,7 @@ class AutoKeyBroadcaster:
                 x = i * cell_width
                 y = main_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(cell_width, cell_height)
+                    self.position_window_correctly(window, x, y, cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         self.log(f"Arranged {window_count} windows with main window layout")
@@ -904,8 +953,7 @@ class AutoKeyBroadcaster:
             main_height = int(screen_height * 0.7)
             main_width = int(main_height * aspect_ratio)
         try:
-            main_window.moveTo(0, 0)
-            main_window.resizeTo(main_width, main_height)
+            self.position_window_correctly(main_window, 0, 0, main_width, main_height)
             self.log(f"Positioned main window ({main_window.title}) at 0,0 with size {main_width}x{main_height}")
         except Exception as e:
             self.log(f"Error positioning main window: {str(e)}")
@@ -918,8 +966,7 @@ class AutoKeyBroadcaster:
                 x = main_width
                 y = i * sec_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(sec_width, sec_height)
+                    self.position_window_correctly(window, x, y, sec_width, sec_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         else:
@@ -932,8 +979,7 @@ class AutoKeyBroadcaster:
                 x = main_width
                 y = i * right_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(right_width, right_height)
+                    self.position_window_correctly(window, x, y, right_width, right_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
             bottom_width = main_width // bottom_count
@@ -943,8 +989,7 @@ class AutoKeyBroadcaster:
                 x = i * bottom_width
                 y = main_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(bottom_width, bottom_height)
+                    self.position_window_correctly(window, x, y, bottom_width, bottom_height)
                 except Exception as e:
                     self.log(f"Error positioning window: {str(e)}")
         self.log(f"Arranged {window_count} windows with main window widescreen layout ({aspect_ratio})")
@@ -965,8 +1010,7 @@ class AutoKeyBroadcaster:
             main_width = int(screen_width * 0.6)
             main_height = int(screen_height * 0.6)
             try:
-                main_window.moveTo(0, 0)
-                main_window.resizeTo(main_width, main_height)
+                self.position_window_correctly(main_window, 0, 0, main_width, main_height)
             except Exception as e:
                 self.log(f"Error positioning main window: {str(e)}")
             remaining_windows = target_windows[1:]
@@ -991,8 +1035,7 @@ class AutoKeyBroadcaster:
                         x = main_width + (col * cell_width)
                         y = row * cell_height
                         try:
-                            window.moveTo(int(x), int(y))
-                            window.resizeTo(int(cell_width), int(cell_height))
+                            self.position_window_correctly(window, int(x), int(y), int(cell_width), int(cell_height))
                         except Exception as e:
                             self.log(f"Error arranging window: {str(e)}")
                 if bottom_windows_count > 0:
@@ -1007,8 +1050,7 @@ class AutoKeyBroadcaster:
                         x = col * cell_width
                         y = main_height + (row * cell_height)
                         try:
-                            window.moveTo(int(x), int(y))
-                            window.resizeTo(int(cell_width), int(cell_height))
+                            self.position_window_correctly(window, int(x), int(y), int(cell_width), int(cell_height))
                         except Exception as e:
                             self.log(f"Error arranging window: {str(e)}")
         else:
@@ -1024,8 +1066,7 @@ class AutoKeyBroadcaster:
                 x = col * cell_width
                 y = row * cell_height
                 try:
-                    window.moveTo(x, y)
-                    window.resizeTo(cell_width, cell_height)
+                    self.position_window_correctly(window, x, y, cell_width, cell_height)
                 except Exception as e:
                     self.log(f"Error arranging window: {str(e)}")
         self.log(f"Arranged {window_count} windows to fill the screen")
@@ -1198,44 +1239,6 @@ class AutoKeyBroadcaster:
                 self.log(f"Error: {str(e)}")
             time.sleep(0.01)
 
-    def broadcast_all_keyboard(self):
-        all_keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'space', 'tab', 'enter', 'shift', 'alt', 'ctrl', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12']
-        prev_key_states = {key: False for key in all_keys}
-        key_hold_times = {key: 0 for key in all_keys}
-        key_repeat_delay = 0.5
-        key_repeat_rate = 0.03
-        while self.is_broadcasting and self.running:
-            try:
-                target_windows = self.get_target_windows()
-                active_window = gw.getActiveWindow()
-                current_time = time.time()
-                if target_windows and any(window == active_window for window in target_windows):
-                    for key in all_keys:
-                        current_state = keyboard.is_pressed(key)
-                        vk_code = self.get_vk_code(key)
-                        if current_state and vk_code:
-                            if not prev_key_states[key]:
-                                if not self.only_on_key_up_var.get():
-                                    for window in target_windows:
-                                        if window != active_window:
-                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
-                                key_hold_times[key] = current_time
-                            elif current_time - key_hold_times[key] > key_repeat_delay:
-                                if not self.only_on_key_up_var.get():
-                                    for window in target_windows:
-                                        if window != active_window:
-                                            win32api.PostMessage(window._hWnd, self.WM_KEYDOWN, vk_code, 0)
-                                key_hold_times[key] += key_repeat_rate
-                        else:
-                            if prev_key_states[key]:
-                                for window in target_windows:
-                                    if window != active_window:
-                                        win32api.PostMessage(window._hWnd, self.WM_KEYUP, vk_code, 0)
-                        prev_key_states[key] = current_state
-            except Exception as e:
-                self.log(f"Error: {str(e)}")
-            time.sleep(0.01)
-
     def get_vk_code(self, key):
         special_keys = {
             'space': win32con.VK_SPACE,
@@ -1257,7 +1260,7 @@ class AutoKeyBroadcaster:
             'f11': win32con.VK_F11,
             'f12': win32con.VK_F12,
         }
-        
+
         if key in special_keys:
             return special_keys[key]
         elif len(key) == 1:
@@ -1345,12 +1348,13 @@ class MonitorInfo:
 
     def get_monitor_info(self):
         monitors = []
-        monitor_enum_proc = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_double)
-        def callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
-            monitor_info = {'name': win32api.GetMonitorInfo(hMonitor)['Device'], 'width': lprcMonitor.contents.right - lprcMonitor.contents.left, 'height': lprcMonitor.contents.bottom - lprcMonitor.contents.top, 'x': lprcMonitor.contents.left, 'y': lprcMonitor.contents.top}
-            monitors.append(monitor_info)
-            return 1
-        ctypes.windll.user32.EnumDisplayMonitors(None, None, monitor_enum_proc(callback), 0)
+        if platform.system() == "Windows":
+            monitor_enum_proc = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.POINTER(ctypes.wintypes.RECT), ctypes.c_double)
+            def callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
+                monitor_info = {'name': win32api.GetMonitorInfo(hMonitor)['Device'], 'width': lprcMonitor.contents.right - lprcMonitor.contents.left, 'height': lprcMonitor.contents.bottom - lprcMonitor.contents.top, 'x': lprcMonitor.contents.left, 'y': lprcMonitor.contents.top}
+                monitors.append(monitor_info)
+                return 1
+            ctypes.windll.user32.EnumDisplayMonitors(None, None, monitor_enum_proc(callback), 0)
         return monitors
 
     def get_primary_monitor(self):
