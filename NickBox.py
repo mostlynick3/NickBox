@@ -1134,7 +1134,7 @@ class AutoKeyBroadcaster:
         target_windows = self.get_target_windows()
         colors = self.generate_colors(99)
 
-        target_windows.sort(key=lambda w: (w.top, w.left))
+        target_windows.sort(key=lambda w: getattr(w, '_hWnd', id(w)))
         for i, window in enumerate(target_windows):
             if self.is_window_on_monitor(window, selected_monitor):
                 color = colors[i % len(colors)]
