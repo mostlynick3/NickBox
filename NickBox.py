@@ -2119,51 +2119,15 @@ class AutoKeyBroadcaster:
         return False
 
     def auto_focus(self):
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00000080)
         last_focused_window = None
-        currently_held_keys = {}  # Track key states more precisely
+        currently_held_keys = {}
+        last_mouse_pos = pyautogui.position()
         key_check_list = [
-            "w",
-            "a",
-            "s",
-            "d",
-            "q",
-            "e",
-            "r",
-            "t",
-            "y",
-            "u",
-            "i",
-            "o",
-            "p",
-            "f",
-            "g",
-            "h",
-            "j",
-            "k",
-            "l",
-            "z",
-            "x",
-            "c",
-            "v",
-            "b",
-            "n",
-            "m",
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "9",
-            "0",
-            "space",
-            "shift",
-            "ctrl",
-            "alt",
-            "tab",
-            "enter",
+            "w", "a", "s", "d", "q", "e", "r", "t", "y", "u", "i", "o", "p",
+            "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m",
+            "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+            "space", "shift", "ctrl", "alt", "tab", "enter"
         ]
 
         while self.is_auto_focusing and self.running:
@@ -2173,6 +2137,13 @@ class AutoKeyBroadcaster:
                     continue
 
                 mouse_x, mouse_y = pyautogui.position()
+                
+                # Only proceed if mouse moved
+                if (mouse_x, mouse_y) == last_mouse_pos:
+                    time.sleep(0.01)
+                    continue
+                last_mouse_pos = (mouse_x, mouse_y)
+
                 target_windows = self.get_target_windows()
                 current_window = gw.getActiveWindow()
                 current_is_target = any(
@@ -2183,7 +2154,6 @@ class AutoKeyBroadcaster:
                 if last_focused_window and not current_is_target and hide_taskbar:
                     self.toggle_taskbar(hide=False)
 
-                # Update currently held keys state
                 new_key_states = {}
                 for key in key_check_list:
                     new_key_states[key] = keyboard.is_pressed(key)
@@ -2196,7 +2166,6 @@ class AutoKeyBroadcaster:
                         if window != current_window and self.is_window_at_top(
                             window, mouse_x, mouse_y
                         ):
-                            # First, release all currently held keys from the current window
                             if current_window and any(
                                 w == current_window for w in target_windows
                             ):
@@ -2227,7 +2196,6 @@ class AutoKeyBroadcaster:
                                             except:
                                                 pass
 
-                            # Switch focus to the new window
                             hwnd = window._hWnd
                             foreground_hwnd = ctypes.windll.user32.GetForegroundWindow()
                             foreground_thread = win32process.GetWindowThreadProcessId(
@@ -2261,7 +2229,6 @@ class AutoKeyBroadcaster:
                                 )
                                 ctypes.windll.user32.SetForegroundWindow(hwnd)
 
-                                # Small delay to ensure focus change completes
                                 time.sleep(0.005)
 
                                 if ctypes.windll.user32.GetForegroundWindow() == hwnd:
@@ -2277,9 +2244,7 @@ class AutoKeyBroadcaster:
                                 except:
                                     pass
 
-                            # If focus succeeded, restore key states to the new window
                             if focus_success:
-                                # Send key down events for keys that are currently held
                                 for key, is_held in new_key_states.items():
                                     if is_held:
                                         vk_code = (
@@ -2306,7 +2271,6 @@ class AutoKeyBroadcaster:
                                 if hide_taskbar:
                                     self.toggle_taskbar(hide=True)
                             else:
-                                # Fallback focus method
                                 try:
                                     win32gui.SendMessage(
                                         hwnd,
@@ -2325,14 +2289,12 @@ class AutoKeyBroadcaster:
 
                             break
 
-                # Update the key state tracking for next iteration
                 currently_held_keys = new_key_states.copy()
 
                 time.sleep(0.01)
             except (RuntimeError, tkinter.TclError):
                 break
             except Exception as e:
-                # Log unexpected errors but continue
                 print(f"Auto focus error: {e}")
                 time.sleep(0.01)
                 continue
