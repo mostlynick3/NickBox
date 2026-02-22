@@ -96,7 +96,7 @@ class AutoKeyBroadcaster:
         self.WM_KEYDOWN = 0x0100
         self.WM_KEYUP = 0x0101
         self.current_profile = "default"
-        self.profiles_dir = "settings"
+        self.profiles_dir = os.path.join(os.environ.get('APPDATA', ''), 'NickBox', 'settings')
         self.profile_config_file = os.path.join(
             self.profiles_dir, "profile_config.json"
         )
