@@ -184,7 +184,8 @@ class AutoKeyBroadcaster:
     def poll_updates(self):
         self.refresh_window_list()
         self.update_round_robin_status()
-        self.update_window_visualization()
+        if not self.dragging_window and not self.resizing_window:
+            self.update_window_visualization()
 
     def toggle_taskbar(self, hide=True):
         taskbar_hwnd = win32gui.FindWindow("Shell_TrayWnd", None)
@@ -1815,9 +1816,9 @@ class AutoKeyBroadcaster:
     def refresh_window_list(self, event=None):
         self.window_list = self.get_all_windows()
         self.window_combo["values"] = self.window_list
-        if self.target_window_pattern.get():
-            target_windows = self.get_target_windows()
-            self.update_window_visualization()
+        if not self.dragging_window and not self.resizing_window:
+            if self.target_window_pattern.get():
+                self.update_window_visualization()
 
     def on_monitor_selected(self, event):
         self.refresh_window_list()
