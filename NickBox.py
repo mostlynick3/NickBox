@@ -1041,10 +1041,10 @@ class AutoKeyBroadcaster:
         if not monitor:
             return False
         return (
-            window.left >= monitor["x"]
-            and window.right <= monitor["x"] + monitor["width"]
-            and window.top >= monitor["y"]
-            and window.bottom <= monitor["y"] + monitor["height"]
+            window.right > monitor["x"]
+            and window.left < monitor["x"] + monitor["width"]
+            and window.bottom > monitor["y"]
+            and window.top < monitor["y"] + monitor["height"]
         )
 
     def sanitize_keys(self, keys_string):
@@ -1267,8 +1267,11 @@ class AutoKeyBroadcaster:
         if closest and closest[0] in self.window_rects:
             self.dragging_window = {
                 "id": closest[0],
+                "window_info": self.window_rects[closest[0]],
                 "start_x": event.x,
                 "start_y": event.y,
+                "prev_x1": self.viz_canvas.coords(closest[0])[0],
+                "prev_y1": self.viz_canvas.coords(closest[0])[1],
                 "original_coords": self.viz_canvas.coords(closest[0]),
                 "canvas_width": self.viz_canvas.winfo_width(),
                 "canvas_height": self.viz_canvas.winfo_height(),
@@ -1285,6 +1288,7 @@ class AutoKeyBroadcaster:
     def drag_window(self, event):
         if not self.dragging_window:
             return
+        window_info = self.dragging_window["window_info"]
         dx = event.x - self.dragging_window["start_x"]
         dy = event.y - self.dragging_window["start_y"]
         orig = self.dragging_window["original_coords"]
@@ -1302,34 +1306,22 @@ class AutoKeyBroadcaster:
             canvas_width = self.dragging_window["canvas_width"]
             canvas_height = self.dragging_window["canvas_height"]
             corner_snap_distance = 20 * self.screen_scale
-            if (
-                abs(new_x1) < corner_snap_distance
-                and abs(new_y1) < corner_snap_distance
-            ):
+            if abs(new_x1) < corner_snap_distance and abs(new_y1) < corner_snap_distance:
                 new_x1 = 0
                 new_y1 = 0
                 new_x2 = orig[2] - orig[0]
                 new_y2 = orig[3] - orig[1]
-            if (
-                abs(new_x2 - canvas_width) < corner_snap_distance
-                and abs(new_y1) < corner_snap_distance
-            ):
+            if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y1) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y1 = 0
                 new_x1 = new_x2 - (orig[2] - orig[0])
                 new_y2 = orig[3] - orig[1]
-            if (
-                abs(new_x1) < corner_snap_distance
-                and abs(new_y2 - canvas_height) < corner_snap_distance
-            ):
+            if abs(new_x1) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x1 = 0
                 new_y2 = canvas_height
                 new_x2 = orig[2] - orig[0]
                 new_y1 = new_y2 - (orig[3] - orig[1])
-            if (
-                abs(new_x2 - canvas_width) < corner_snap_distance
-                and abs(new_y2 - canvas_height) < corner_snap_distance
-            ):
+            if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y2 = canvas_height
                 new_x1 = new_x2 - (orig[2] - orig[0])
@@ -1341,6 +1333,8 @@ class AutoKeyBroadcaster:
                 if rect_id == current_id:
                     continue
                 rect_coords = self.viz_canvas.coords(rect_id)
+                if not rect_coords:
+                    continue
                 rx1, ry1, rx2, ry2 = rect_coords
                 if abs(new_x1 - rx2) < snap_distance:
                     new_x1 = rx2
@@ -1354,21 +1348,30 @@ class AutoKeyBroadcaster:
                 if abs(new_y2 - ry1) < snap_distance:
                     new_y2 = ry1
                     new_y1 = new_y2 - (orig[3] - orig[1])
-        self.viz_canvas.coords(
-            self.dragging_window["id"], new_x1, new_y1, new_x2, new_y2
-        )
-        window_info = self.window_rects[self.dragging_window["id"]]
+
+        prev_x1 = self.dragging_window["prev_x1"]
+        prev_y1 = self.dragging_window["prev_y1"]
+        move_dx = new_x1 - prev_x1
+        move_dy = new_y1 - prev_y1
+
+        self.viz_canvas.coords(self.dragging_window["id"], new_x1, new_y1, new_x2, new_y2)
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
             if item != self.dragging_window["id"]:
-                self.viz_canvas.move(item, new_x1 - orig[0], new_y1 - orig[1])
+                self.viz_canvas.move(item, move_dx, move_dy)
 
+        self.dragging_window["prev_x1"] = new_x1
+        self.dragging_window["prev_y1"] = new_y1
+    
     def end_window_drag(self, event):
         if not self.dragging_window:
             return
+        window_info = self.dragging_window["window_info"]
         rect_id = self.dragging_window["id"]
-        window_info = self.window_rects[rect_id]
         window = window_info["window"]
         new_coords = self.viz_canvas.coords(rect_id)
+        if not new_coords:
+            self.dragging_window = None
+            return
         new_left = int(new_coords[0] / self.screen_scale)
         new_top = int(new_coords[1] / self.screen_scale)
         new_right = int(new_coords[2] / self.screen_scale)
@@ -1376,13 +1379,14 @@ class AutoKeyBroadcaster:
         width = new_right - new_left
         height = new_bottom - new_top
         self.position_window_correctly(window, new_left, new_top, width, height)
-        self.viz_canvas.itemconfig(rect_id, width=1)
-        for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
-            if "text" in self.viz_canvas.type(item):
-                self.viz_canvas.itemconfig(item, state="normal")
-        resize_handle = window_info.get("resize_handle")
-        if resize_handle:
-            self.viz_canvas.itemconfig(resize_handle, state="normal")
+        if rect_id in self.window_rects:
+            self.viz_canvas.itemconfig(rect_id, width=1)
+            for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
+                if "text" in self.viz_canvas.type(item):
+                    self.viz_canvas.itemconfig(item, state="normal")
+            resize_handle = window_info.get("resize_handle")
+            if resize_handle:
+                self.viz_canvas.itemconfig(resize_handle, state="normal")
         self.dragging_window = None
         self.update_window_visualization()
 
@@ -1405,15 +1409,14 @@ class AutoKeyBroadcaster:
                 if rect_id:
                     self.resizing_window = {
                         "id": rect_id,
+                        "window_info": self.window_rects[rect_id],
                         "start_x": event.x,
                         "start_y": event.y,
                         "original_coords": self.viz_canvas.coords(rect_id),
                     }
                     self.viz_canvas.itemconfig(rect_id, width=2)
                     window_info = self.window_rects[rect_id]
-                    for item in self.viz_canvas.find_withtag(
-                        f"window_{window_info['index']}"
-                    ):
+                    for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
                         if "text" in self.viz_canvas.type(item):
                             self.viz_canvas.itemconfig(item, state="hidden")
             except (ValueError, IndexError) as e:
@@ -1422,6 +1425,7 @@ class AutoKeyBroadcaster:
     def resize_window(self, event):
         if not self.resizing_window:
             return
+        window_info = self.resizing_window["window_info"]
         dx = event.x - self.resizing_window["start_x"]
         dy = event.y - self.resizing_window["start_y"]
         orig = self.resizing_window["original_coords"]
@@ -1437,10 +1441,7 @@ class AutoKeyBroadcaster:
             canvas_width = self.viz_canvas.winfo_width()
             canvas_height = self.viz_canvas.winfo_height()
             corner_snap_distance = 20 * self.screen_scale
-            if (
-                abs(new_x2 - canvas_width) < corner_snap_distance
-                and abs(new_y2 - canvas_height) < corner_snap_distance
-            ):
+            if abs(new_x2 - canvas_width) < corner_snap_distance and abs(new_y2 - canvas_height) < corner_snap_distance:
                 new_x2 = canvas_width
                 new_y2 = canvas_height
         if self.window_snap_enabled.get():
@@ -1450,42 +1451,34 @@ class AutoKeyBroadcaster:
                 if rect_id == current_id:
                     continue
                 rect_coords = self.viz_canvas.coords(rect_id)
+                if not rect_coords:
+                    continue
                 rx1, ry1, rx2, ry2 = rect_coords
                 if abs(new_x2 - rx1) < snap_distance:
                     new_x2 = rx1
                 if abs(new_y2 - ry1) < snap_distance:
                     new_y2 = ry1
-        self.viz_canvas.coords(
-            self.resizing_window["id"], new_x1, new_y1, new_x2, new_y2
-        )
-        window_info = self.window_rects[self.resizing_window["id"]]
+        self.viz_canvas.coords(self.resizing_window["id"], new_x1, new_y1, new_x2, new_y2)
         resize_handle = None
         for item in self.viz_canvas.find_withtag(f"resize_{window_info['index']}"):
             resize_handle = item
             break
         if resize_handle:
-            self.viz_canvas.coords(
-                resize_handle, new_x2, new_y2 - 10, new_x2 - 10, new_y2, new_x2, new_y2
-            )
+            self.viz_canvas.coords(resize_handle, new_x2, new_y2 - 10, new_x2 - 10, new_y2, new_x2, new_y2)
         for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
-            if item != self.resizing_window["id"] and "text" in self.viz_canvas.type(
-                item
-            ):
-                self.viz_canvas.coords(
-                    item, (new_x1 + new_x2) / 2, (new_y1 + new_y2) / 2
-                )
+            if item != self.resizing_window["id"] and "text" in self.viz_canvas.type(item):
+                self.viz_canvas.coords(item, (new_x1 + new_x2) / 2, (new_y1 + new_y2) / 2)
 
     def end_window_resize(self, event):
         if not self.resizing_window:
             return
+        window_info = self.resizing_window["window_info"]
         rect_id = self.resizing_window["id"]
-        if rect_id not in self.window_rects:
-            self.resizing_window = None
-            return
-        rect_id = self.resizing_window["id"]
-        window_info = self.window_rects[rect_id]
         window = window_info["window"]
         new_coords = self.viz_canvas.coords(rect_id)
+        if not new_coords:
+            self.resizing_window = None
+            return
         new_left = int(new_coords[0] / self.screen_scale)
         new_top = int(new_coords[1] / self.screen_scale)
         new_right = int(new_coords[2] / self.screen_scale)
@@ -1493,13 +1486,14 @@ class AutoKeyBroadcaster:
         width = new_right - new_left
         height = new_bottom - new_top
         self.position_window_correctly(window, new_left, new_top, width, height)
-        self.viz_canvas.itemconfig(rect_id, width=1)
-        for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
-            if "text" in self.viz_canvas.type(item):
-                self.viz_canvas.itemconfig(item, state="normal")
+        if rect_id in self.window_rects:
+            self.viz_canvas.itemconfig(rect_id, width=1)
+            for item in self.viz_canvas.find_withtag(f"window_{window_info['index']}"):
+                if "text" in self.viz_canvas.type(item):
+                    self.viz_canvas.itemconfig(item, state="normal")
         self.resizing_window = None
         self.update_window_visualization()
-
+    
     def toggle_borderless(self):
         target_windows = self.get_target_windows()
         borderless = self.borderless_var.get()
