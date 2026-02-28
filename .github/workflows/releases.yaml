@@ -4,6 +4,7 @@ on:
     branches: [ main ]
   release:
     types: [ published ]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -14,6 +15,9 @@ jobs:
         with:
           ref: web
       
+      - name: Debug releases API
+        run: curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | jq .
+      
       - name: Get releases and generate HTML
         run: |
           echo "<!DOCTYPE html><html><head><title>Releases</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:20px;} .release{margin-bottom:30px;border-bottom:1px solid #eee;padding-bottom:20px;} .assets{margin-top:10px;}</style></head><body><h1>Releases</h1>" > releases.html
@@ -23,10 +27,13 @@ jobs:
           
           echo "</body></html>" >> releases.html
       
+      - name: Debug HTML output
+        run: cat releases.html
+      
       - name: Commit and push
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add releases.html
           git commit -m "Update releases.html" || exit 0
-          git push
+          git push origin HEAD:web
