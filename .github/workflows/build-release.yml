@@ -1,0 +1,91 @@
+name: Build and Release
+
+# NOTE: NickBox is Windows-only by design (it depends on
+# pywin32 / win32gui / win32con / win32api / win32process and
+# ctypes.windll, none of which exist on Linux). There is therefore
+# no Linux binary job here. Adding an ubuntu-latest PyInstaller job
+# would fail at `pip install pywin32` and the resulting binary would
+# crash on import. If Linux support is ever added, add a matrix job
+# mirroring NickClick's build-release.yml.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pyautogui pynput sv-ttk keyboard pygetwindow pywin32 pillow
+
+      - name: Build binary with PyInstaller
+        run: pyinstaller --noconfirm --onefile --windowed --name NickBox --collect-data sv_ttk NickBox.py
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          mv dist/NickBox.exe release-assets/NickBox-windows.exe
+          ls -lh release-assets/
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NickBox-windows
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    # Only build binaries into a GitHub Release for main;
+    # all other branches/PRs still run the `build` job above as CI validation.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -lhR release-assets/
+
+      - name: Generate tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "tag=build-${{ github.run_number }}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Build ${{ steps.tag.outputs.tag }}
+          body: |
+            Automated build for commit ${{ github.sha }}.
+
+            - Commit: ${{ github.event.head_commit.message }}
+            - Branch: ${{ github.ref_name }}
+            - Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Assets:
+            - `NickBox-windows.exe` — Windows binary (NickBox is Windows-only)
+          files: release-assets/*
+          make_latest: true
